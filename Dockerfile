@@ -16,6 +16,9 @@ RUN npm run build
 # 多阶段构建：运行阶段
 FROM nginx:alpine
 
+# 安装 curl 用于健康检查
+RUN apk add --no-cache curl
+
 # 复制构建产物
 COPY --from=builder /app/dist /usr/share/nginx/html
 
@@ -26,7 +29,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 
 # 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD curl -f http://localhost:80/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
