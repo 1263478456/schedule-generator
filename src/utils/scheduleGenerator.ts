@@ -58,6 +58,20 @@ export function generateSchedule(config: ScheduleConfig): {
   stats: ScheduleStats;
 } {
   const { year, month, employees, weeklyRestDays } = config;
+  
+  // 边界情况：没有员工
+  if (employees.length === 0) {
+    return {
+      results: [],
+      stats: {
+        totalDays: 0,
+        workDaysPerEmployee: 0,
+        restDaysPerEmployee: 0,
+        noRestDaysCount: 0,
+      },
+    };
+  }
+  
   const totalDays = getDaysInMonth(year, month);
   
   // 计算每月休息天数（如果设置了的话）
@@ -160,6 +174,20 @@ export function generateOptimizedSchedule(config: ScheduleConfig): {
   stats: ScheduleStats;
 } {
   const { year, month, employees, weeklyRestDays } = config;
+  
+  // 边界情况：没有员工
+  if (employees.length === 0) {
+    return {
+      results: [],
+      stats: {
+        totalDays: 0,
+        workDaysPerEmployee: 0,
+        restDaysPerEmployee: 0,
+        noRestDaysCount: 0,
+      },
+    };
+  }
+  
   const totalDays = getDaysInMonth(year, month);
   
   // 找出所有不排休的日期

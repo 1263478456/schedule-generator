@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Employee } from '../types';
+import { validateEmployee, escapeHtml } from '../utils/validation';
 
 interface EmployeeManagerProps {
   employees: Employee[];
@@ -10,42 +11,64 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [errors, setErrors] = useState<string[]>([]);
 
   const addEmployee = () => {
-    if (newName.trim()) {
-      const newEmployee: Employee = {
-        id: Date.now().toString(),
-        name: newName.trim(),
-      };
-      onChange([...employees, newEmployee]);
-      setNewName('');
+    const validationErrors = validateEmployee(newName, employees);
+    
+    if (validationErrors.length > 0) {
+      setErrors(validationErrors.map(e => e.message));
+      return;
     }
+    
+    const newEmployee: Employee = {
+      id: Date.now().toString(),
+      name: newName.trim(),
+    };
+    onChange([...employees, newEmployee]);
+    setNewName('');
+    setErrors([]);
   };
 
   const removeEmployee = (id: string) => {
-    onChange(employees.filter(e => e.id !== id));
+    const employee = employees.find(e => e.id === id);
+    if (employee && window.confirm(`确定要删除员工"${employee.name}"吗？`)) {
+      onChange(employees.filter(e => e.id !== id));
+    }
   };
 
   const startEditing = (employee: Employee) => {
     setEditingId(employee.id);
     setEditingName(employee.name);
+    setErrors([]);
   };
 
   const saveEditing = () => {
-    if (editingId && editingName.trim()) {
-      onChange(
-        employees.map(e =>
-          e.id === editingId ? { ...e, name: editingName.trim() } : e
-        )
-      );
-      setEditingId(null);
-      setEditingName('');
+    if (!editingId) return;
+    
+    // 验证（排除当前编辑的员工）
+    const otherEmployees = employees.filter(e => e.id !== editingId);
+    const validationErrors = validateEmployee(editingName, otherEmployees);
+    
+    if (validationErrors.length > 0) {
+      setErrors(validationErrors.map(e => e.message));
+      return;
     }
+    
+    onChange(
+      employees.map(e =>
+        e.id === editingId ? { ...e, name: editingName.trim() } : e
+      )
+    );
+    setEditingId(null);
+    setEditingName('');
+    setErrors([]);
   };
 
   const cancelEditing = () => {
     setEditingId(null);
     setEditingName('');
+    setErrors([]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -55,6 +78,8 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
       } else {
         addEmployee();
       }
+    } else if (e.key === 'Escape') {
+      cancelEditing();
     }
   };
 
@@ -73,14 +98,20 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
       </div>
 
       {/* 添加员工输入框 */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-2">
         <input
           type="text"
           value={newName}
-          onChange={(e) => setNewName(e.target.value)}
+          onChange={(e) => {
+            setNewName(e.target.value);
+            if (errors.length > 0) setErrors([]);
+          }}
           onKeyDown={handleKeyDown}
           placeholder="输入员工姓名..."
-          className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          maxLength={20}
+          className={`flex-1 px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+            errors.length > 0 ? 'border-red-300' : 'border-gray-200'
+          }`}
         />
         <button
           onClick={addEmployee}
@@ -93,6 +124,15 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
           添加
         </button>
       </div>
+
+      {/* 错误提示 */}
+      {errors.length > 0 && (
+        <div className="mb-4 p-2 bg-red-50 rounded-lg">
+          {errors.map((err, i) => (
+            <p key={i} className="text-xs text-red-600">{escapeHtml(err)}</p>
+          ))}
+        </div>
+      )}
 
       {/* 员工列表 */}
       <div className="space-y-2">
@@ -109,22 +149,26 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
               key={employee.id}
               className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-medium">
-                {employee.name.charAt(0)}
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                {escapeHtml(employee.name.charAt(0))}
               </div>
               
               {editingId === employee.id ? (
                 <input
                   type="text"
                   value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
+                  onChange={(e) => {
+                    setEditingName(e.target.value);
+                    if (errors.length > 0) setErrors([]);
+                  }}
                   onKeyDown={handleKeyDown}
                   onBlur={saveEditing}
                   autoFocus
+                  maxLength={20}
                   className="flex-1 px-3 py-1.5 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               ) : (
-                <span className="flex-1 font-medium text-gray-700">{employee.name}</span>
+                <span className="flex-1 font-medium text-gray-700 truncate">{escapeHtml(employee.name)}</span>
               )}
 
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -133,7 +177,7 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
                     <button
                       onClick={saveEditing}
                       className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors"
-                      title="保存"
+                      title="保存 (Enter)"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -142,7 +186,7 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
                     <button
                       onClick={cancelEditing}
                       className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md transition-colors"
-                      title="取消"
+                      title="取消 (Esc)"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -181,6 +225,9 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
       {employees.length > 0 && (
         <div className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-500">
           共 {employees.length} 名员工
+          {employees.length > 30 && (
+            <span className="text-amber-600 ml-2">（员工较多，可能影响排班效果）</span>
+          )}
         </div>
       )}
     </div>

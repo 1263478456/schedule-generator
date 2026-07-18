@@ -1,16 +1,28 @@
 import { useState } from 'react';
 import type { ScheduleConfig } from '../types';
 import { exportToPDF, exportToHTML } from '../utils/exportUtils';
+import { validateExportConfig } from '../utils/validation';
 
 interface ExportPanelProps {
   config: ScheduleConfig;
+  onSaveHistory: () => void;
+  onClearConfig: () => void;
 }
 
-export default function ExportPanel({ config }: ExportPanelProps) {
+export default function ExportPanel({ config, onSaveHistory, onClearConfig }: ExportPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportType, setExportType] = useState<'pdf' | 'html'>('pdf');
 
   const handleExport = async () => {
+    // 验证配置
+    const validation = validateExportConfig(config);
+    
+    if (!validation.valid) {
+      const errorMsg = validation.errors.map(e => e.message).join('\n');
+      alert(`导出失败：${errorMsg}`);
+      return;
+    }
+    
     setIsExporting(true);
     try {
       if (exportType === 'pdf') {
@@ -18,8 +30,8 @@ export default function ExportPanel({ config }: ExportPanelProps) {
       } else {
         exportToHTML(config);
       }
-    } catch (error) {
-      console.error('导出失败:', error);
+    } catch (err) {
+      console.error('导出失败:', err);
       alert('导出失败，请重试');
     } finally {
       setIsExporting(false);
@@ -82,7 +94,7 @@ export default function ExportPanel({ config }: ExportPanelProps) {
       {/* 导出按钮 */}
       <button
         onClick={handleExport}
-        disabled={isExporting}
+        disabled={isExporting || config.employees.length === 0}
         className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
       >
         {isExporting ? (
@@ -103,6 +115,26 @@ export default function ExportPanel({ config }: ExportPanelProps) {
         )}
       </button>
 
+      {/* 保存历史按钮 */}
+      <button
+        onClick={onSaveHistory}
+        disabled={config.employees.length === 0}
+        className="w-full mt-3 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+        </svg>
+        保存到历史记录
+      </button>
+
+      {/* 重置按钮 */}
+      <button
+        onClick={onClearConfig}
+        className="w-full mt-2 py-2 text-sm text-gray-500 hover:text-red-600 transition-colors"
+      >
+        重置配置
+      </button>
+
       {/* 打印提示 */}
       <div className="mt-4 p-3 bg-gray-50 rounded-lg">
         <div className="flex items-start gap-2">
@@ -112,9 +144,9 @@ export default function ExportPanel({ config }: ExportPanelProps) {
           <div className="text-xs text-gray-600">
             <p className="font-medium mb-1">打印建议：</p>
             <ul className="list-disc list-inside space-y-0.5 text-gray-500">
-              <li>PDF 文件已优化为 A4 尺寸 (210×297mm)</li>
-              <li>打印时选择"实际大小"以获得最佳效果</li>
-              <li>横向打印可获得更大的表格显示</li>
+              <li>PDF 已优化为 A4 尺寸 (210×297mm)</li>
+              <li>打印时选择"实际大小"效果最佳</li>
+              <li>横向打印可获得更大表格显示</li>
             </ul>
           </div>
         </div>
