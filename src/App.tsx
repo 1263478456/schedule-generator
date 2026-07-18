@@ -11,6 +11,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import ConfirmDialog from './components/ConfirmDialog';
 import HistoryPanel from './components/HistoryPanel';
 import Login from './components/Login';
+import UserSettings from './components/UserSettings';
 import { ToastContainer, useToast } from './components/Toast';
 import { APP_VERSION } from './utils/version';
 
@@ -47,6 +48,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<'config' | 'preview'>('config');
   const [showHistory, setShowHistory] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [showUserSettings, setShowUserSettings] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -246,6 +248,17 @@ function App() {
                 </button>
                 
                 <button
+                  onClick={() => setShowUserSettings(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="账户设置"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span className="hidden sm:inline">{user.displayName || user.username}</span>
+                </button>
+                
+                <button
                   onClick={handleLogout}
                   className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
@@ -357,6 +370,15 @@ function App() {
           onConfirm={confirmClearConfig}
           onCancel={() => setDeleteConfirm(false)}
         />
+
+        {/* 用户设置弹窗 */}
+        {showUserSettings && (
+          <UserSettings
+            user={user}
+            onClose={() => setShowUserSettings(false)}
+            onUpdate={(updatedUser) => setUser(updatedUser)}
+          />
+        )}
 
         {/* Toast 通知 */}
         <ToastContainer toasts={toasts} onRemove={removeToast} />

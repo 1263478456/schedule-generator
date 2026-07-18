@@ -164,6 +164,23 @@ router.get('/me', authMiddleware, (req, res) => {
   }
 });
 
+// 更新个人信息
+router.put('/profile', authMiddleware, (req, res) => {
+  try {
+    const userId = (req as any).user.id;
+    const { displayName } = req.body;
+    
+    if (displayName !== undefined) {
+      db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(displayName, userId);
+    }
+    
+    res.json({ success: true, message: '个人信息更新成功' });
+  } catch (error) {
+    console.error('更新个人信息失败:', error);
+    res.status(500).json({ error: '更新个人信息失败' });
+  }
+});
+
 // 修改密码
 router.put('/password', authMiddleware, (req, res) => {
   try {
