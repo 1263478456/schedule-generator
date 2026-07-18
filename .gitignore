@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+\"schedule.db\"  
+\"schedule.db-shm\"  
+\"schedule.db-wal\"  
