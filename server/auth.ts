@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { db, hashPassword, verifyPassword } from './database.js';
 

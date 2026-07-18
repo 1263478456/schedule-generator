@@ -13,7 +13,7 @@ if (!fs.existsSync(dbDir)) {
 }
 
 // 创建数据库连接
-const db = new Database(DB_PATH);
+const db: any = new Database(DB_PATH);
 
 // 启用 WAL 模式提高性能
 db.pragma('journal_mode = WAL');

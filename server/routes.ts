@@ -9,7 +9,7 @@ const router = Router();
 // 获取配置（需要登录）
 router.get('/config', authMiddleware, (req, res) => {
   try {
-    const config = db.prepare('SELECT * FROM config WHERE id = 1').get();
+    const config = db.prepare('SELECT * FROM config WHERE id = 1').get() as any;
     
     if (!config) {
       return res.status(404).json({ error: '配置不存在' });
@@ -81,9 +81,10 @@ router.get('/history', authMiddleware, (req, res) => {
       SELECT * FROM history 
       ORDER BY created_at DESC 
       LIMIT ? OFFSET ?
-    `).all(limit, offset);
+    `).all(limit, offset) as any[];
     
-    const { total } = db.prepare('SELECT COUNT(*) as total FROM history').get() as { total: number };
+    const totalResult = db.prepare('SELECT COUNT(*) as total FROM history').get() as any;
+    const total = totalResult?.total || 0;
     
     const parsedRecords = records.map((record: any) => ({
       id: record.id,
@@ -111,7 +112,7 @@ router.get('/history/:id', authMiddleware, (req, res) => {
   try {
     const { id } = req.params;
     
-    const record = db.prepare('SELECT * FROM history WHERE id = ?').get(id);
+    const record = db.prepare('SELECT * FROM history WHERE id = ?').get(id) as any;
     
     if (!record) {
       return res.status(404).json({ error: '记录不存在' });
