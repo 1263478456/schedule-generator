@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# 安装构建依赖（better-sqlite3 需要）
+RUN apk add --no-cache python3 make g++
+
 # 安装依赖
 COPY package*.json ./
 RUN npm ci
@@ -13,17 +16,11 @@ COPY . .
 # 构建前端
 RUN npm run build
 
-# 复制服务器代码到单独的目录
-RUN mkdir -p /app/server/dist
-
-# 构建服务器（使用 tsx 直接运行 TypeScript，不需要编译）
-# 服务器代码将在运行时通过 tsx 执行
-
 # 多阶段构建：运行阶段
 FROM node:20-alpine
 
-# 安装 curl 用于健康检查
-RUN apk add --no-cache curl
+# 安装运行时依赖
+RUN apk add --no-cache curl python3
 
 WORKDIR /app
 
