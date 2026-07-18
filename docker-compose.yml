@@ -1,13 +1,84 @@
+###############################################################################
+# 智能排班表生成器 - Docker Compose 部署配置
+# 项目地址: https://github.com/1263478456/schedule-generator
+# Docker Hub: https://hub.docker.com/r/1263478456/schedule-generator
+###############################################################################
+
 services:
   schedule-generator:
-    build: .
+    # 镜像来源（从 Docker Hub 拉取）
+    image: 1263478456/schedule-generator:latest
+    
+    # 容器名称
     container_name: schedule-generator
-    ports:
-      - "3080:80"
+    
+    # 重启策略
+    # - no: 不自动重启（默认）
+    # - always: 总是重启
+    # - unless-stopped: 除非手动停止，否则总是重启
+    # - on-failure: 只在非零退出码时重启
     restart: unless-stopped
+    
+    # 端口映射 - 格式: 宿主机端口:容器端口
+    ports:
+      - "3080:80"    # 修改左侧数字可更改访问端口
+    
+    # 环境变量（如果需要）
+    environment:
+      - TZ=Asia/Shanghai    # 设置时区为上海
+      # - NODE_ENV=production  # 可选：设置运行环境
+    
+    # 健康检查
     healthcheck:
+      # 检查命令
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      # 检查间隔（秒）
       interval: 30s
-      timeout: 3s
-      retries: 3
+      # 超时时间（秒）
+      timeout: 10s
+      # 启动后等待时间（秒）
       start_period: 10s
+      # 重试次数
+      retries: 3
+    
+    # 资源限制（可选）
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'        # 最大 CPU 使用量
+          memory: 256M       # 最大内存使用量
+        reservations:
+          cpus: '0.25'       # 预留 CPU
+          memory: 64M        # 预留内存
+    
+    # 日志配置
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"      # 单个日志文件最大 10MB
+        max-file: "3"        # 最多保留 3 个日志文件
+    
+    # 网络配置
+    networks:
+      - web
+    
+    # 安全选项（可选，增强安全性）
+    security_opt:
+      - no-new-privileges:true
+    
+    # 只读文件系统（可选，增强安全性）
+    # read_only: true
+    # tmpfs:
+    #   - /tmp
+    #   - /var/cache/nginx
+
+# 网络配置
+networks:
+  web:
+    name: web
+    driver: bridge
+
+# 如果需要持久化数据（本项目使用 localStorage，不需要卷）
+# volumes:
+#   schedule-data:
+#     driver: local
