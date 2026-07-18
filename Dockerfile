@@ -6,7 +6,7 @@ WORKDIR /app
 # 安装构建依赖（better-sqlite3 需要）
 RUN apk add --no-cache python3 make g++
 
-# 安装依赖
+# 安装所有依赖（包括 devDependencies 用于构建）
 COPY package*.json ./
 RUN npm ci
 
@@ -20,13 +20,15 @@ RUN npm run build
 FROM node:20-alpine
 
 # 安装运行时依赖
-RUN apk add --no-cache curl python3
+RUN apk add --no-cache curl
 
 WORKDIR /app
 
-# 复制 package.json 和安装生产依赖
+# 复制 package.json
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+
+# 复制构建好的 node_modules（包含编译好的原生模块）
+COPY --from=builder /app/node_modules ./node_modules
 
 # 复制构建产物
 COPY --from=builder /app/dist ./dist
