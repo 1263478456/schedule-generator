@@ -31,6 +31,10 @@ const defaultConfig: ScheduleConfigType = {
     maxConcurrentRest: 1,
     conflictResolution: 'notify',
   },
+  randomness: {
+    enabled: true,
+    intensity: 30,
+  },
 };
 
 interface User {
@@ -85,6 +89,7 @@ function App() {
           employees: savedConfig.employees,
           noRestDayType: (savedConfig as any).noRestDayType || 'work',
           scheduleStrategy: (savedConfig as any).scheduleStrategy || defaultConfig.scheduleStrategy,
+          randomness: (savedConfig as any).randomness || defaultConfig.randomness,
         });
       } catch (err) {
         console.error('加载配置失败:', err);

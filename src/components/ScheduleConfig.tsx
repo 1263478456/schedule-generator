@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ScheduleConfig as ScheduleConfigType, ScheduleStrategy, ConflictResolution } from '../types';
+import type { ScheduleConfig as ScheduleConfigType, ScheduleStrategy, ConflictResolution, RandomnessConfig } from '../types';
 import { DAY_NAMES_FULL, MONTH_NAMES, DEFAULT_SCHEDULE_STRATEGY } from '../types';
 
 interface ScheduleConfigProps {
@@ -19,6 +19,13 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
     const currentStrategy = config.scheduleStrategy || DEFAULT_SCHEDULE_STRATEGY;
     updateConfig({
       scheduleStrategy: { ...currentStrategy, ...updates },
+    });
+  };
+
+  const updateRandomness = (updates: Partial<RandomnessConfig>) => {
+    const currentRandomness = config.randomness || { enabled: true, intensity: 30 };
+    updateConfig({
+      randomness: { ...currentRandomness, ...updates },
     });
   };
 
@@ -46,6 +53,7 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
   const strategy = config.scheduleStrategy || DEFAULT_SCHEDULE_STRATEGY;
+  const randomness = config.randomness || { enabled: true, intensity: 30 };
 
   const conflictOptions: { value: ConflictResolution; label: string; description: string }[] = [
     { value: 'allow', label: '允许', description: '不做处理，允许多人同休' },
@@ -331,6 +339,75 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
                 ))}
               </div>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* 随机性设置 */}
+      <div className="border-t border-gray-100 pt-6 mt-6">
+        <button
+          onClick={() => setShowStrategy(!showStrategy)}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span className="text-sm font-medium text-gray-700">随机性设置</span>
+          </div>
+          <svg 
+            className={`w-5 h-5 text-gray-400 transition-transform ${showStrategy ? 'rotate-180' : ''}`}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {showStrategy && (
+          <div className="mt-4 space-y-4">
+            {/* 启用随机性 */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-gray-700">启用随机性</p>
+                <p className="text-xs text-gray-500">每次生成排班时略有不同</p>
+              </div>
+              <button
+                onClick={() => updateRandomness({ enabled: !randomness.enabled })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  randomness.enabled ? 'bg-amber-500' : 'bg-gray-300'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  randomness.enabled ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+
+            {/* 随机强度 */}
+            {randomness.enabled && (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  随机强度
+                </label>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-gray-500">稳定</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={randomness.intensity}
+                    onChange={(e) => updateRandomness({ intensity: parseInt(e.target.value) })}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                  />
+                  <span className="text-xs text-gray-500">随机</span>
+                </div>
+                <div className="mt-2 text-xs text-gray-500">
+                  当前强度：{randomness.intensity}%（值越大，每次排班结果差异越大）
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

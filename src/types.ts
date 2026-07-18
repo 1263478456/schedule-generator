@@ -4,6 +4,8 @@ export interface Employee {
   name: string;
   // 个人休息天数配置
   restConfig?: EmployeeRestConfig;
+  // 休息偏好
+  restPreference?: RestPreference;
 }
 
 // 员工个人休息配置
@@ -13,6 +15,9 @@ export interface EmployeeRestConfig {
   // 本月最多休息天数
   maxRestDays: number;
 }
+
+// 休息偏好
+export type RestPreference = 'consecutive' | 'scattered' | 'random';
 
 // 不排休日的类型
 export type NoRestDayType = 'work' | 'rest';
@@ -34,6 +39,16 @@ export interface ScheduleConfig {
   scheduleStrategy: ScheduleStrategy;
   // 不排休日的类型：'work' 表示工作日，'rest' 表示休息日
   noRestDayType: NoRestDayType;
+  // 全局随机性设置
+  randomness: RandomnessConfig;
+}
+
+// 随机性配置
+export interface RandomnessConfig {
+  // 是否启用随机性
+  enabled: boolean;
+  // 随机强度 (0-100)
+  intensity: number;
 }
 
 // 排班策略
@@ -69,8 +84,8 @@ export interface ScheduleDay {
   date: string; // YYYY-MM-DD
   dayOfWeek: number; // 0-6
   isRest: boolean;
-  isNoAssign: boolean; // 未排休（不排休且类型为'rest'时）
-  isWorkDay: boolean; // 是否为工作日
+  isNoAssign: boolean;
+  isWorkDay: boolean;
   // 当天同时休息的员工
   concurrentEmployees?: string[];
 }
@@ -89,11 +104,8 @@ export interface ScheduleStats {
   workDaysPerEmployee: number;
   restDaysPerEmployee: number;
   noRestDaysCount: number;
-  // 平均每天同时休息人数
   avgConcurrentRest: number;
-  // 最大同时休息人数
   maxConcurrentRest: number;
-  // 工作日天数（排除不排休日）
   totalWorkDays: number;
 }
 
@@ -109,9 +121,22 @@ export const MONTH_NAMES = [
   '七月', '八月', '九月', '十月', '十一月', '十二月'
 ];
 
+// 休息偏好选项
+export const REST_PREFERENCE_OPTIONS: { value: RestPreference; label: string; description: string }[] = [
+  { value: 'consecutive', label: '连休', description: '尽量安排连续的休息日' },
+  { value: 'scattered', label: '分散', description: '休息日尽量分散开' },
+  { value: 'random', label: '随机', description: '随机安排休息日' },
+];
+
 // 默认排班策略
 export const DEFAULT_SCHEDULE_STRATEGY: ScheduleStrategy = {
   avoidMultipleRest: true,
   maxConcurrentRest: 1,
   conflictResolution: 'notify',
+};
+
+// 默认随机性配置
+export const DEFAULT_RANDOMNESS_CONFIG: RandomnessConfig = {
+  enabled: true,
+  intensity: 30,
 };

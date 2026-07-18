@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { Employee, EmployeeRestConfig } from '../types';
+import type { Employee, EmployeeRestConfig, RestPreference } from '../types';
 import { validateEmployee, escapeHtml } from '../utils/validation';
+import { REST_PREFERENCE_OPTIONS } from '../types';
 
 interface EmployeeManagerProps {
   employees: Employee[];
@@ -82,7 +83,6 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
           const currentConfig = e.restConfig || { minRestDays: 0, maxRestDays: 10 };
           const newConfig = { ...currentConfig, ...config };
           
-          // 确保 minRest <= maxRest
           if (newConfig.minRestDays > newConfig.maxRestDays) {
             if (config.minRestDays !== undefined) {
               newConfig.maxRestDays = newConfig.minRestDays;
@@ -92,6 +92,17 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
           }
           
           return { ...e, restConfig: newConfig };
+        }
+        return e;
+      })
+    );
+  };
+
+  const updateRestPreference = (employeeId: string, preference: RestPreference) => {
+    onChange(
+      employees.map(e => {
+        if (e.id === employeeId) {
+          return { ...e, restPreference: preference };
         }
         return e;
       })
@@ -272,8 +283,31 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
                 {/* 休息天数配置面板 */}
                 {isConfiguring && (
                   <div className="px-3 pb-3 pt-1 border-t border-gray-200">
+                    {/* 休息偏好选择 */}
+                    <div className="mb-4">
+                      <label className="block text-xs font-medium text-gray-600 mb-2">
+                        休息偏好
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {REST_PREFERENCE_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => updateRestPreference(employee.id, option.value)}
+                            className={`p-2 rounded-lg text-center text-xs transition-all ${
+                              (employee.restPreference || 'scattered') === option.value
+                                ? 'bg-indigo-100 border-2 border-indigo-500 text-indigo-700'
+                                : 'bg-white border-2 border-gray-200 text-gray-600 hover:border-gray-300'
+                            }`}
+                          >
+                            <div className="font-medium">{option.label}</div>
+                            <div className="text-[10px] opacity-75 mt-0.5">{option.description}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* 休息天数滑块 */}
                     <div className="grid grid-cols-2 gap-4">
-                      {/* 最少休息天数 */}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
                           最少休息天数
@@ -293,7 +327,6 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
                         </div>
                       </div>
                       
-                      {/* 最多休息天数 */}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
                           最多休息天数
@@ -315,7 +348,7 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
                     </div>
                     
                     <div className="mt-2 text-xs text-gray-500">
-                      💡 最少休息天数必须满足，最多休息天数会在资源允许时尽量满足。
+                      💡 连休偏好会安排连续的休息日，分散偏好会均匀分布休息日。
                     </div>
                   </div>
                 )}
