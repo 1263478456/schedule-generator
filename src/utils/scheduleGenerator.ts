@@ -21,25 +21,8 @@ function formatDate(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function isForceWorkDay(config: ScheduleConfig, year: number, month: number, day: number, dayOfWeek: number): boolean {
-  // 检查是否在强制工作日星期列表中
-  if (config.noRestDaysOfWeek.includes(dayOfWeek)) {
-    return true;
-  }
-  // 检查是否在强制工作日日期列表中
-  const dateStr = formatDate(year, month, day);
-  return config.noRestDates.includes(dateStr);
-}
-
-function getEmployeeRestConfig(
-  employee: { restConfig?: EmployeeRestConfig },
-  defaultMonthlyRestDays: number
-): EmployeeRestConfig {
-  // 如果员工有个人配置，使用个人配置；否则使用全局默认值
-  if (employee.restConfig) {
-    return employee.restConfig;
-  }
-  return { minRestDays: defaultMonthlyRestDays, maxRestDays: defaultMonthlyRestDays };
+function getEmployeeRestConfig(employee: { restConfig?: EmployeeRestConfig }, defaultRestDays: number): EmployeeRestConfig {
+  return employee.restConfig || { minRestDays: 0, maxRestDays: defaultRestDays };
 }
 
 function getEmployeeRestPreference(employee: { restPreference?: RestPreference }): RestPreference {
@@ -117,32 +100,16 @@ function generateConsecutiveRestDays(availableDays: number[], count: number, ran
 /**
  * 生成分散休息日
  */
-function generateScatteredRestDays(availableDays: number[], count: number, totalDays: number, random: () => number): number[] {
+function generateScatteredRestDays(availableDays: number[], count: number, _totalDays: number): number[] {
   if (count <= 0 || availableDays.length === 0) return [];
   
-  const interval = Math.floor(totalDays / count);
-  const startOffset = Math.floor(random() * interval);
+  const sortedDays = [...availableDays].sort((a, b) => a - b);
+  const interval = Math.floor(sortedDays.length / count);
   
   const result: number[] = [];
-  const sortedDays = [...availableDays].sort((a, b) => a - b);
   
-  for (let i = 0; i < count; i++) {
-    const targetDay = startOffset + i * interval + 1;
-    
-    let bestDay = sortedDays[0];
-    let bestDiff = Math.abs(bestDay - targetDay);
-    
-    for (const day of sortedDays) {
-      const diff = Math.abs(day - targetDay);
-      if (diff < bestDiff && !result.includes(day)) {
-        bestDay = day;
-        bestDiff = diff;
-      }
-    }
-    
-    if (!result.includes(bestDay)) {
-      result.push(bestDay);
-    }
+  for (let i = 0; i < count && i * interval < sortedDays.length; i++) {
+    result.push(sortedDays[i * interval]);
   }
   
   return result;
@@ -159,27 +126,6 @@ function generateRandomRestDays(availableDays: number[], count: number, random: 
 }
 
 /**
- * 根据偏好生成休息日
- */
-function generateRestDaysByPreference(
-  availableDays: number[],
-  count: number,
-  totalDays: number,
-  preference: RestPreference,
-  random: () => number
-): number[] {
-  switch (preference) {
-    case 'consecutive':
-      return generateConsecutiveRestDays(availableDays, count, random);
-    case 'scattered':
-      return generateScatteredRestDays(availableDays, count, totalDays, random);
-    case 'random':
-    default:
-      return generateRandomRestDays(availableDays, count, random);
-  }
-}
-
-/**
  * 智能排班算法
  */
 export function generateSmartSchedule(config: ScheduleConfig): {
@@ -187,7 +133,7 @@ export function generateSmartSchedule(config: ScheduleConfig): {
   stats: ScheduleStats;
   conflicts: ScheduleConflict[];
 } {
-  const { year, month, employees, monthlyRestDays, maxConcurrentRest, randomness } = config;
+  const { year, month, employees, monthlyRestDays, noRestDaysOfWeek, noRestDates, maxConcurrentRest, randomness } = config;
   
   if (employees.length === 0) {
     return {
@@ -199,6 +145,7 @@ export function generateSmartSchedule(config: ScheduleConfig): {
         forceWorkDaysCount: 0,
         avgConcurrentRest: 0,
         maxConcurrentRest: 0,
+        availableRestDays: 0,
       },
       conflicts: [],
     };
@@ -213,14 +160,19 @@ export function generateSmartSchedule(config: ScheduleConfig): {
   
   // 1. 找出强制工作日和可排休日
   const forceWorkDays: number[] = [];
-  const assignableDays: number[] = [];
+  const availableDays: number[] = [];
   
   for (let day = 1; day <= totalDays; day++) {
     const dayOfWeek = getDayOfWeek(year, month, day);
-    if (isForceWorkDay(config, year, month, day, dayOfWeek)) {
+    const dateStr = formatDate(year, month, day);
+    
+    // 检查是否为强制工作日
+    const isForceWork = noRestDaysOfWeek.includes(dayOfWeek) || noRestDates.includes(dateStr);
+    
+    if (isForceWork) {
       forceWorkDays.push(day);
     } else {
-      assignableDays.push(day);
+      availableDays.push(day);
     }
   }
   
@@ -229,73 +181,137 @@ export function generateSmartSchedule(config: ScheduleConfig): {
     const restConfig = getEmployeeRestConfig(emp, monthlyRestDays);
     const preference = getEmployeeRestPreference(emp);
     
-    // 确保最少休息天数不超过可排休天数
-    const minRest = Math.min(restConfig.minRestDays, assignableDays.length);
-    // 确保最多休息天数不超过可排休天数
-    const maxRest = Math.min(restConfig.maxRestDays, assignableDays.length);
+    // 确保休息天数不超过可排休天数
+    const minRest = Math.min(restConfig.minRestDays, availableDays.length);
+    const maxRest = Math.min(restConfig.maxRestDays, availableDays.length);
     
     return {
       employee: emp,
       minRest,
       maxRest,
+      targetRest: Math.min(monthlyRestDays, maxRest),
       preference,
     };
   });
   
-  // 3. 初始化排班数据结构
+  // 3. 按最少休息天数降序排列（优先满足要求高的）
+  employeeConfigs.sort((a, b) => b.minRest - a.minRest);
+  
+  // 4. 初始化排班数据结构
   const schedule: Map<string, Set<number>> = new Map();
   const dayAssignments: Map<number, string[]> = new Map();
   
   employees.forEach((emp) => {
     schedule.set(emp.id, new Set());
   });
-  assignableDays.forEach((day) => {
+  availableDays.forEach((day) => {
     dayAssignments.set(day, []);
   });
   
-  // 4. 第一轮：为每个员工分配最少休息天数
+  // 5. 第一轮：为每个员工分配最少休息天数
   for (const { employee, minRest, preference } of employeeConfigs) {
     if (minRest <= 0) continue;
     
-    // 获取该员工可分配的日期（排除已经分配给自己的和超出并发限制的）
-    const availableForEmployee = assignableDays.filter((day) => {
+    let restDays: number[] = [];
+    
+    switch (preference) {
+      case 'consecutive':
+        restDays = generateConsecutiveRestDays(availableDays, minRest, random);
+        break;
+      case 'scattered':
+        restDays = generateScatteredRestDays(availableDays, minRest, totalDays);
+        break;
+      case 'random':
+      default:
+        restDays = generateRandomRestDays(availableDays, minRest, random);
+        break;
+    }
+    
+    // 应用排班（检查并发限制）
+    for (const day of restDays) {
+      const dayEmps = dayAssignments.get(day) || [];
+      if (dayEmps.length < maxConcurrentRest) {
+        schedule.get(employee.id)?.add(day);
+        dayAssignments.set(day, [...dayEmps, employee.id]);
+      }
+    }
+  }
+  
+  // 6. 第二轮：分配目标休息天数
+  for (const { employee, targetRest, preference } of employeeConfigs) {
+    const currentRest = schedule.get(employee.id)?.size || 0;
+    const remaining = targetRest - currentRest;
+    
+    if (remaining <= 0) continue;
+    
+    const availDays = availableDays.filter((day) => {
       if (schedule.get(employee.id)?.has(day)) return false;
       const dayEmps = dayAssignments.get(day) || [];
       return dayEmps.length < maxConcurrentRest;
     });
     
-    const restDays = generateRestDaysByPreference(availableForEmployee, minRest, totalDays, preference, random);
+    let additionalDays: number[] = [];
     
-    for (const day of restDays) {
-      schedule.get(employee.id)?.add(day);
+    switch (preference) {
+      case 'consecutive':
+        additionalDays = generateConsecutiveRestDays(availDays, remaining, random);
+        break;
+      case 'scattered':
+        additionalDays = generateScatteredRestDays(availDays, remaining, totalDays);
+        break;
+      case 'random':
+      default:
+        additionalDays = generateRandomRestDays(availDays, remaining, random);
+        break;
+    }
+    
+    for (const day of additionalDays) {
       const dayEmps = dayAssignments.get(day) || [];
-      dayAssignments.set(day, [...dayEmps, employee.id]);
+      if (dayEmps.length < maxConcurrentRest) {
+        schedule.get(employee.id)?.add(day);
+        dayAssignments.set(day, [...dayEmps, employee.id]);
+      }
     }
   }
   
-  // 5. 第二轮：尝试满足最多休息天数
+  // 7. 第三轮：尝试满足最大休息天数
   for (const { employee, maxRest, preference } of employeeConfigs) {
     const currentRest = schedule.get(employee.id)?.size || 0;
     const remaining = maxRest - currentRest;
     
     if (remaining <= 0) continue;
     
-    const availableForEmployee = assignableDays.filter((day) => {
+    const availDays = availableDays.filter((day) => {
       if (schedule.get(employee.id)?.has(day)) return false;
       const dayEmps = dayAssignments.get(day) || [];
       return dayEmps.length < maxConcurrentRest;
     });
     
-    const additionalDays = generateRestDaysByPreference(availableForEmployee, remaining, totalDays, preference, random);
+    let additionalDays: number[] = [];
+    
+    switch (preference) {
+      case 'consecutive':
+        additionalDays = generateConsecutiveRestDays(availDays, remaining, random);
+        break;
+      case 'scattered':
+        additionalDays = generateScatteredRestDays(availDays, remaining, totalDays);
+        break;
+      case 'random':
+      default:
+        additionalDays = generateRandomRestDays(availDays, remaining, random);
+        break;
+    }
     
     for (const day of additionalDays) {
-      schedule.get(employee.id)?.add(day);
       const dayEmps = dayAssignments.get(day) || [];
-      dayAssignments.set(day, [...dayEmps, employee.id]);
+      if (dayEmps.length < maxConcurrentRest) {
+        schedule.get(employee.id)?.add(day);
+        dayAssignments.set(day, [...dayEmps, employee.id]);
+      }
     }
   }
   
-  // 6. 生成结果和检查冲突
+  // 8. 生成结果
   const results: ScheduleResult[] = [];
   
   for (const emp of employees) {
@@ -317,6 +333,7 @@ export function generateSmartSchedule(config: ScheduleConfig): {
     
     for (let day = 1; day <= totalDays; day++) {
       const dayOfWeek = getDayOfWeek(year, month, day);
+      const dateStr = formatDate(year, month, day);
       const isForceWork = forceWorkDays.includes(day);
       const isRest = restDays.has(day);
       const concurrentEmps = dayAssignments.get(day) || [];
@@ -325,18 +342,12 @@ export function generateSmartSchedule(config: ScheduleConfig): {
         concurrentRestDays++;
       }
       
-      // 计算是否为工作日
-      // 强制工作日 = 必须上班
-      // 休息日 = 不上班
-      // 其他 = 上班
-      const isWorkDay = isForceWork || !isRest;
-      
       days.push({
-        date: formatDate(year, month, day),
+        date: dateStr,
         dayOfWeek,
         isRest,
         isForceWork,
-        isWorkDay,
+        isWorkDay: isForceWork || !isRest,
         concurrentEmployees: concurrentEmps.map((id) => 
           employees.find((e) => e.id === id)?.name || id
         ),
@@ -353,7 +364,7 @@ export function generateSmartSchedule(config: ScheduleConfig): {
     });
   }
   
-  // 7. 检查并发冲突
+  // 9. 检查并发冲突
   for (const [day, empIds] of dayAssignments.entries()) {
     if (empIds.length > maxConcurrentRest) {
       const empNames = empIds.map((id) => 
@@ -363,12 +374,12 @@ export function generateSmartSchedule(config: ScheduleConfig): {
         date: formatDate(year, month, day),
         employeeNames: empNames,
         type: 'concurrent_rest',
-        message: `${day}日有 ${empNames.length} 人同时休息（允许最多 ${maxConcurrentRest} 人）`,
+        message: `${day}日有 ${empNames.length} 人同时休息（限制最多 ${maxConcurrentRest} 人）`,
       });
     }
   }
   
-  // 8. 计算统计
+  // 10. 计算统计
   let totalConcurrentRest = 0;
   let maxConcurrentInDay = 0;
   
@@ -390,6 +401,7 @@ export function generateSmartSchedule(config: ScheduleConfig): {
     forceWorkDaysCount: forceWorkDays.length,
     avgConcurrentRest: totalDays > 0 ? Math.round((totalConcurrentRest / totalDays) * 10) / 10 : 0,
     maxConcurrentRest: maxConcurrentInDay,
+    availableRestDays: availableDays.length,
   };
   
   return { results, stats, conflicts };

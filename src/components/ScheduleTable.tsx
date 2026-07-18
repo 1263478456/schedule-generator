@@ -18,7 +18,7 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
     return {
       day,
       dayOfWeek: date.getDay(),
-      isWeekend: date.getDay() === 0 || date.getDay() === 6,
+      isWeekend: config.noRestDaysOfWeek.includes(date.getDay()),
     };
   });
 
@@ -37,7 +37,7 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
           </div>
         </div>
         
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-4 text-xs">
           <div className="flex items-center gap-1">
             <span className="w-3 h-3 rounded bg-green-100 border border-green-200"></span>
             <span className="text-gray-600">休息</span>
@@ -58,35 +58,39 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
       </div>
 
       {/* 统计信息 */}
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-5 gap-2 mb-4">
         <div className="bg-blue-50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-blue-600">{stats.totalDays}</div>
+          <div className="text-xl font-bold text-blue-600">{stats.totalDays}</div>
           <div className="text-xs text-blue-500">总天数</div>
         </div>
         <div className="bg-green-50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-green-600">{stats.restDaysPerEmployee}</div>
-          <div className="text-xs text-green-500">平均休息天数</div>
+          <div className="text-xl font-bold text-green-600">{stats.restDaysPerEmployee}</div>
+          <div className="text-xs text-green-500">平均休息</div>
+        </div>
+        <div className="bg-purple-50 rounded-lg p-3 text-center">
+          <div className="text-xl font-bold text-purple-600">{stats.workDaysPerEmployee}</div>
+          <div className="text-xs text-purple-500">平均工作</div>
         </div>
         <div className="bg-red-50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-red-600">{stats.forceWorkDaysCount}</div>
-          <div className="text-xs text-red-500">强制工作日</div>
+          <div className="text-xl font-bold text-red-600">{stats.forceWorkDaysCount}</div>
+          <div className="text-xs text-red-500">强制工作</div>
         </div>
         <div className="bg-amber-50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-amber-600">{stats.maxConcurrentRest}</div>
-          <div className="text-xs text-amber-500">最大同时休息</div>
+          <div className="text-xl font-bold text-amber-600">{stats.maxConcurrentRest}</div>
+          <div className="text-xs text-amber-500">最多同休</div>
         </div>
       </div>
 
       {/* 冲突警告 */}
       {conflicts.length > 0 && (
-        <div className="mb-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
-          <div className="flex items-center gap-2 mb-2">
-            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+          <div className="flex items-center gap-2 mb-1">
+            <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <span className="font-medium text-amber-800">排班冲突提示</span>
+            <span className="text-sm font-medium text-amber-800">排班提示</span>
           </div>
-          <div className="text-sm text-amber-700 space-y-1">
+          <div className="text-xs text-amber-700">
             {conflicts.map((conflict, idx) => (
               <div key={idx}>• {conflict.message}</div>
             ))}
@@ -99,23 +103,22 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="bg-gray-50">
-              <th className="sticky left-0 bg-gray-50 z-10 px-3 py-2 text-left font-semibold text-gray-700 min-w-[80px]">
+              <th className="sticky left-0 bg-gray-50 z-10 px-2 py-2 text-left font-semibold text-gray-700 min-w-[70px]">
                 姓名
               </th>
               {dates.map(({ day, dayOfWeek, isWeekend }) => (
                 <th
                   key={day}
-                  className={`px-1 py-2 text-center font-medium min-w-[32px] ${
-                    isWeekend ? 'bg-red-50 text-red-700' : 'text-gray-600'
+                  className={`px-1 py-2 text-center font-medium min-w-[28px] ${
+                    isWeekend ? 'bg-red-50 text-red-600' : 'text-gray-600'
                   }`}
                 >
                   <div className="text-xs">{day}</div>
                   <div className="text-[10px] text-gray-400">{DAY_NAMES[dayOfWeek]}</div>
                 </th>
               ))}
-              <th className="px-2 py-2 text-center font-medium text-blue-600 min-w-[50px]">工作</th>
-              <th className="px-2 py-2 text-center font-medium text-green-600 min-w-[50px]">休息</th>
-              <th className="px-2 py-2 text-center font-medium text-amber-600 min-w-[50px]">同休</th>
+              <th className="px-2 py-2 text-center font-medium text-blue-600 text-xs">工作</th>
+              <th className="px-2 py-2 text-center font-medium text-green-600 text-xs">休息</th>
             </tr>
           </thead>
           <tbody>
@@ -126,59 +129,39 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
                   idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
                 }`}
               >
-                <td className="sticky left-0 z-10 px-3 py-2.5 font-medium text-gray-800 bg-inherit">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center text-white text-xs font-medium">
+                <td className="sticky left-0 z-10 px-2 py-2 font-medium text-gray-800 bg-inherit text-sm">
+                  <div className="flex items-center gap-1">
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
                       {result.employeeName.charAt(0)}
                     </div>
-                    {result.employeeName}
+                    <span className="truncate">{result.employeeName}</span>
                   </div>
                 </td>
                 {result.days.map((day, dayIdx) => {
                   const hasConcurrent = day.concurrentEmployees && day.concurrentEmployees.length > 1;
-                  let cellClass = '';
-                  let cellContent = '';
-                  
-                  if (day.isForceWork) {
-                    cellClass = 'bg-red-100 text-red-600';
-                    cellContent = '强';
-                  } else if (day.isRest) {
-                    if (hasConcurrent) {
-                      cellClass = 'bg-amber-100 text-amber-700';
-                      cellContent = '休*';
-                    } else {
-                      cellClass = 'bg-green-100 text-green-700';
-                      cellContent = '休';
-                    }
-                  } else {
-                    cellClass = 'bg-blue-50 text-blue-600';
-                    cellContent = '✓';
-                  }
-                  
                   return (
                     <td
                       key={dayIdx}
-                      className={`px-1 py-2.5 text-center text-xs font-medium ${cellClass}`}
-                      title={
-                        hasConcurrent 
-                          ? `同休: ${day.concurrentEmployees?.join(', ')}` 
-                          : day.isForceWork 
-                          ? '强制工作日' 
-                          : undefined
-                      }
+                      className={`px-1 py-2 text-center text-xs font-medium ${
+                        day.isForceWork
+                          ? 'bg-red-50 text-red-400'
+                          : day.isRest
+                          ? hasConcurrent
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-green-100 text-green-700'
+                          : 'bg-blue-50 text-blue-600'
+                      }`}
+                      title={hasConcurrent ? `同休: ${day.concurrentEmployees?.join(', ')}` : undefined}
                     >
-                      {cellContent}
+                      {day.isForceWork ? '—' : day.isRest ? (hasConcurrent ? '休*' : '休') : '✓'}
                     </td>
                   );
                 })}
-                <td className="px-2 py-2.5 text-center font-semibold text-blue-600">
+                <td className="px-2 py-2 text-center font-semibold text-blue-600 text-xs">
                   {result.totalWorkDays}
                 </td>
-                <td className="px-2 py-2.5 text-center font-semibold text-green-600">
+                <td className="px-2 py-2 text-center font-semibold text-green-600 text-xs">
                   {result.totalRestDays}
-                </td>
-                <td className="px-2 py-2.5 text-center font-semibold text-amber-600">
-                  {result.concurrentRestDays}
                 </td>
               </tr>
             ))}
@@ -187,9 +170,11 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
       </div>
 
       {/* 图例说明 */}
-      <div className="mt-4 text-xs text-gray-500 space-y-1">
-        <div><span className="text-red-600 font-medium">强</span> = 强制工作日（不排休日）</div>
-        <div><span className="text-amber-600 font-medium">休*</span> = 多人同一天休息</div>
+      <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
+        <span><span className="text-red-400">—</span> = 强制工作日</span>
+        <span><span className="text-green-700">休</span> = 休息日</span>
+        <span><span className="text-amber-700">休*</span> = 多人同休</span>
+        <span><span className="text-blue-600">✓</span> = 工作日</span>
       </div>
     </div>
   );

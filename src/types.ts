@@ -2,7 +2,7 @@
 export interface Employee {
   id: string;
   name: string;
-  // 个人休息配置（覆盖全局默认值）
+  // 个人休息配置
   restConfig?: EmployeeRestConfig;
   // 休息偏好
   restPreference?: RestPreference;
@@ -10,7 +10,7 @@ export interface Employee {
 
 // 员工个人休息配置
 export interface EmployeeRestConfig {
-  // 本月最少休息天数（设为0表示不想休息）
+  // 本月最少休息天数（0 = 不想休息）
   minRestDays: number;
   // 本月最多休息天数
   maxRestDays: number;
@@ -24,11 +24,11 @@ export interface ScheduleConfig {
   // 排班月份
   year: number;
   month: number;
-  // 每月休息天数（全局默认值）
+  // 全局每月休息天数（默认值）
   monthlyRestDays: number;
-  // 不排休的星期几（0=周日, 1=周一, ..., 6=周六）- 这些天强制工作
+  // 不排休的星期几（0=周日, 1=周一, ..., 6=周六）- 强制工作日
   noRestDaysOfWeek: number[];
-  // 不排休的具体日期（格式: "YYYY-MM-DD"）- 这些天强制工作
+  // 不排休的具体日期（格式: "YYYY-MM-DD"）- 强制工作日
   noRestDates: string[];
   // 员工列表
   employees: Employee[];
@@ -53,7 +53,6 @@ export interface ScheduleResult {
   days: ScheduleDay[];
   totalWorkDays: number;
   totalRestDays: number;
-  // 与其他员工同休的天数
   concurrentRestDays: number;
 }
 
@@ -62,9 +61,8 @@ export interface ScheduleDay {
   date: string; // YYYY-MM-DD
   dayOfWeek: number; // 0-6
   isRest: boolean;
-  isForceWork: boolean; // 强制工作日（不排休日）
+  isForceWork: boolean; // 是否为强制工作日
   isWorkDay: boolean;
-  // 当天同时休息的员工
   concurrentEmployees?: string[];
 }
 
@@ -72,7 +70,7 @@ export interface ScheduleDay {
 export interface ScheduleConflict {
   date: string;
   employeeNames: string[];
-  type: 'insufficient_rest' | 'concurrent_rest';
+  type: 'concurrent_rest' | 'insufficient_rest';
   message: string;
 }
 
@@ -84,12 +82,13 @@ export interface ScheduleStats {
   forceWorkDaysCount: number; // 强制工作日天数
   avgConcurrentRest: number;
   maxConcurrentRest: number;
+  availableRestDays: number; // 可排休的天数
 }
 
 // 星期名称
 export const DAY_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
-// 星期全称（用于显示）
+// 星期全称
 export const DAY_NAMES_FULL = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
 
 // 月份名称
@@ -101,7 +100,7 @@ export const MONTH_NAMES = [
 // 休息偏好选项
 export const REST_PREFERENCE_OPTIONS: { value: RestPreference; label: string; description: string }[] = [
   { value: 'consecutive', label: '连休', description: '尽量安排连续的休息日' },
-  { value: 'scattered', label: '分散', description: '休息日尽量分散开' },
+  { value: 'scattered', label: '分散', description: '休息日尽量均匀分布' },
   { value: 'random', label: '随机', description: '随机安排休息日' },
 ];
 

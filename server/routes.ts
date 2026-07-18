@@ -15,15 +15,14 @@ router.get('/config', authMiddleware, (req, res) => {
       return res.status(404).json({ error: '配置不存在' });
     }
     
-    // 解析 JSON 字段
     res.json({
       year: config.year,
       month: config.month,
-      monthlyRestDays: config.monthly_rest_days || 4,
+      monthlyRestDays: config.monthly_rest_days,
       noRestDaysOfWeek: JSON.parse(config.no_rest_days_of_week || '[]'),
       noRestDates: JSON.parse(config.no_rest_dates || '[]'),
       employees: JSON.parse(config.employees || '[]'),
-      maxConcurrentRest: config.max_concurrent_rest || 2,
+      maxConcurrentRest: config.max_concurrent_rest,
       randomness: JSON.parse(config.randomness || '{"enabled":true,"intensity":30}'),
       updatedAt: config.updated_at,
     });
@@ -59,7 +58,7 @@ router.put('/config', authMiddleware, (req, res) => {
       JSON.stringify(noRestDaysOfWeek || []),
       JSON.stringify(noRestDates || []),
       JSON.stringify(employees || []),
-      maxConcurrentRest || 2,
+      maxConcurrentRest || 1,
       JSON.stringify(randomness || { enabled: true, intensity: 30 })
     );
     
@@ -84,10 +83,8 @@ router.get('/history', authMiddleware, (req, res) => {
       LIMIT ? OFFSET ?
     `).all(limit, offset);
     
-    // 获取总数
     const { total } = db.prepare('SELECT COUNT(*) as total FROM history').get() as { total: number };
     
-    // 解析 JSON 字段
     const parsedRecords = records.map((record: any) => ({
       id: record.id,
       name: record.name,
@@ -139,7 +136,6 @@ router.post('/history', authMiddleware, (req, res) => {
   try {
     const { id, name, config, results, stats } = req.body;
     
-    // 生成 ID（如果未提供）
     const recordId = id || `schedule-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     const stmt = db.prepare(`
