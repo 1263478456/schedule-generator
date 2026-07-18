@@ -42,11 +42,7 @@ export function generateScheduleHTML(config: ScheduleConfig): string {
       let cellStyle = '';
       let cellContent = '';
       
-      if (day.isForceWork) {
-        // 强制工作日
-        cellStyle = 'background-color: #fee2e2; color: #dc2626;';
-        cellContent = '强';
-      } else if (day.isRest) {
+      if (day.isRest) {
         // 休息日
         cellStyle = 'background-color: #dcfce7; color: #166534; font-weight: 500;';
         cellContent = '休';

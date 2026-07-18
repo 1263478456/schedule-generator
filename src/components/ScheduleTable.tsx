@@ -143,9 +143,7 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
                     <td
                       key={dayIdx}
                       className={`px-1 py-2 text-center text-xs font-medium ${
-                        day.isForceWork
-                          ? 'bg-red-50 text-red-400'
-                          : day.isRest
+                        day.isRest
                           ? hasConcurrent
                             ? 'bg-amber-100 text-amber-700'
                             : 'bg-green-100 text-green-700'
@@ -153,7 +151,7 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
                       }`}
                       title={hasConcurrent ? `同休: ${day.concurrentEmployees?.join(', ')}` : undefined}
                     >
-                      {day.isForceWork ? '—' : day.isRest ? (hasConcurrent ? '休*' : '休') : '✓'}
+                      {day.isRest ? (hasConcurrent ? '休*' : '休') : '✓'}
                     </td>
                   );
                 })}

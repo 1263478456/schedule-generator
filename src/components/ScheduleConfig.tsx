@@ -16,9 +16,9 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
   };
 
   const updateRandomness = (updates: Partial<RandomnessConfig>) => {
-    const currentRandomness = config.randomness || { enabled: true, intensity: 30 };
+    const current = config.randomness || { enabled: true, intensity: 30 };
     updateConfig({
-      randomness: { ...currentRandomness, ...updates },
+      randomness: { ...current, ...updates },
     });
   };
 
@@ -97,49 +97,26 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
         <label className="block text-sm font-medium text-gray-700 mb-2">
           每月休息天数（默认）
         </label>
-        <p className="text-xs text-gray-500 mb-2">所有员工的默认每月休息天数，可在员工管理中为个人单独设置</p>
         <div className="flex items-center gap-4">
           <input
             type="range"
             min="0"
-            max="10"
+            max="15"
             value={config.monthlyRestDays}
             onChange={(e) => updateConfig({ monthlyRestDays: parseInt(e.target.value) })}
             className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
           />
-          <div className="w-16 h-10 flex items-center justify-center bg-purple-50 rounded-lg">
+          <div className="w-12 h-10 flex items-center justify-center bg-purple-50 rounded-lg">
             <span className="text-xl font-bold text-purple-600">{config.monthlyRestDays}</span>
-            <span className="text-xs text-purple-500 ml-1">天</span>
           </div>
         </div>
+        <p className="mt-1 text-xs text-gray-500">此值作为员工的默认休息天数，可在员工管理中为个人单独设置</p>
       </div>
 
-      {/* 最大同时休息人数 */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          每天最多休息人数
-        </label>
-        <p className="text-xs text-gray-500 mb-2">限制每天最多有多少人同时休息</p>
-        <div className="flex items-center gap-4">
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={config.maxConcurrentRest}
-            onChange={(e) => updateConfig({ maxConcurrentRest: parseInt(e.target.value) })}
-            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
-          />
-          <div className="w-16 h-10 flex items-center justify-center bg-purple-50 rounded-lg">
-            <span className="text-xl font-bold text-purple-600">{config.maxConcurrentRest}</span>
-            <span className="text-xs text-purple-500 ml-1">人</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 不排休的星期几 */}
+      {/* 强制工作日（不排休的星期几） */}
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">强制工作日（不排休）</label>
-        <p className="text-xs text-gray-500 mb-3">选中的星期几所有人都必须上班，不能安排休息</p>
+        <p className="text-xs text-gray-500 mb-3">选中的星期几所有人必须上班，不会安排休息</p>
         <div className="grid grid-cols-7 gap-2">
           {DAY_NAMES_FULL.map((name, index) => {
             const isSelected = config.noRestDaysOfWeek.includes(index);
@@ -150,7 +127,7 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
                 onClick={() => toggleNoRestDayOfWeek(index)}
                 className={`py-2 px-1 rounded-lg text-sm font-medium transition-all ${
                   isSelected
-                    ? 'bg-red-500 text-white shadow-md'
+                    ? 'bg-red-600 text-white shadow-md'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -159,13 +136,17 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
             );
           })}
         </div>
-        <p className="text-xs text-gray-400 mt-2">红色 = 强制工作日</p>
+        {config.noRestDaysOfWeek.length > 0 && (
+          <p className="mt-2 text-xs text-red-600">
+            ⚠️ {config.noRestDaysOfWeek.map(d => DAY_NAMES_FULL[d]).join('、')} 为强制工作日
+          </p>
+        )}
       </div>
 
-      {/* 不排休的具体日期 */}
+      {/* 强制工作日（具体日期） */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">强制工作日（特殊日期）</label>
-        <p className="text-xs text-gray-500 mb-3">添加特殊日期（如节假日），这些天所有人都必须上班</p>
+        <label className="block text-sm font-medium text-gray-700 mb-2">强制工作日（具体日期）</label>
+        <p className="text-xs text-gray-500 mb-3">添加特殊日期（如节假日），这些日期所有人必须上班</p>
         <div className="flex gap-2 mb-3">
           <input
             type="date"
@@ -176,7 +157,7 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
           <button
             onClick={addRestDate}
             disabled={!newRestDate}
-            className="px-4 py-2 bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg font-medium hover:bg-purple-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             添加
           </button>
@@ -204,18 +185,39 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
         )}
       </div>
 
+      {/* 最大同时休息人数 */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          最大同时休息人数
+        </label>
+        <div className="flex items-center gap-4">
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={config.maxConcurrentRest}
+            onChange={(e) => updateConfig({ maxConcurrentRest: parseInt(e.target.value) })}
+            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+          />
+          <div className="w-12 h-10 flex items-center justify-center bg-purple-50 rounded-lg">
+            <span className="text-xl font-bold text-purple-600">{config.maxConcurrentRest}</span>
+          </div>
+        </div>
+        <p className="mt-1 text-xs text-gray-500">同一天最多允许几人同时休息</p>
+      </div>
+
       {/* 高级设置 */}
-      <div className="border-t border-gray-100 pt-4">
+      <div className="border-t border-gray-100 pt-6">
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="flex items-center justify-between w-full text-left"
         >
           <div className="flex items-center gap-2">
-            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <span className="text-sm font-medium text-gray-700">高级设置</span>
+            <span className="text-sm font-medium text-gray-700">随机性设置</span>
           </div>
           <svg 
             className={`w-5 h-5 text-gray-400 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
@@ -229,45 +231,43 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
 
         {showAdvanced && (
           <div className="mt-4 space-y-4">
-            {/* 随机性设置 */}
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-700">启用随机性</p>
-                  <p className="text-xs text-gray-500">每次生成排班时略有不同</p>
-                </div>
-                <button
-                  onClick={() => updateRandomness({ enabled: !randomness.enabled })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    randomness.enabled ? 'bg-amber-500' : 'bg-gray-300'
-                  }`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    randomness.enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`} />
-                </button>
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-gray-700">启用随机性</p>
+                <p className="text-xs text-gray-500">每次生成排班时略有不同</p>
               </div>
-
-              {randomness.enabled && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    随机强度：{randomness.intensity}%
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400">稳定</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={randomness.intensity}
-                      onChange={(e) => updateRandomness({ intensity: parseInt(e.target.value) })}
-                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                    />
-                    <span className="text-xs text-gray-400">随机</span>
-                  </div>
-                </div>
-              )}
+              <button
+                onClick={() => updateRandomness({ enabled: !randomness.enabled })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  randomness.enabled ? 'bg-purple-500' : 'bg-gray-300'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  randomness.enabled ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
             </div>
+
+            {randomness.enabled && (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  随机强度
+                </label>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-gray-500">稳定</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={randomness.intensity}
+                    onChange={(e) => updateRandomness({ intensity: parseInt(e.target.value) })}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  />
+                  <span className="text-xs text-gray-500">随机</span>
+                </div>
+                <div className="mt-2 text-xs text-gray-500">当前强度：{randomness.intensity}%</div>
+              </div>
+            )}
           </div>
         )}
       </div>
