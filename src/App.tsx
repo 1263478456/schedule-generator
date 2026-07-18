@@ -4,6 +4,7 @@ import EmployeeManager from './components/EmployeeManager';
 import ScheduleConfig from './components/ScheduleConfig';
 import ScheduleTable from './components/ScheduleTable';
 import ExportPanel from './components/ExportPanel';
+import { APP_VERSION } from './utils/version';
 
 const currentYear = new Date().getFullYear();
 const currentMonth = new Date().getMonth() + 1;
@@ -109,7 +110,7 @@ function App() {
       {/* 页脚 */}
       <footer className="mt-12 py-6 border-t border-gray-200 bg-white/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-500">
-          <p>智能排班表生成器 · 轻松管理员工排班</p>
+          <p>智能排班表生成器 v{APP_VERSION} · 轻松管理员工排班</p>
         </div>
       </footer>
     </div>
