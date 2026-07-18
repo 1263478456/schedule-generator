@@ -1,7 +1,7 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import type { ScheduleConfig } from '../types';
-import { DAY_NAMES, DAY_NAMES_FULL } from '../types';
+import { DAY_NAMES_FULL } from '../types';
 import { generateOptimizedSchedule } from './scheduleGenerator';
 
 /**
@@ -13,64 +13,118 @@ function formatDateDisplay(dateStr: string): string {
 }
 
 /**
- * 生成排班表HTML内容（优化版）
+ * 生成排班表HTML内容（日历格式）
  */
 export function generateScheduleHTML(config: ScheduleConfig): string {
   const { results, stats } = generateOptimizedSchedule(config);
   const { year, month, noRestDaysOfWeek, noRestDates } = config;
   
   const totalDays = new Date(year, month, 0).getDate();
+  const firstDayOfWeek = new Date(year, month - 1, 1).getDay(); // 0=周日
   
-  // 计算动态列宽（确保表格能适应页面宽度）
-  // 横向 A4 宽度 297mm，减去左右边距 20mm，可用宽度 277mm
-  // 姓名列 50mm，工作/休息统计列各 25mm，剩余给日期列
-  const usableWidth = 277; // mm
-  const nameColWidth = 50;
-  const statsColWidth = 28;
-  const dateColWidth = Math.max(6, Math.floor((usableWidth - nameColWidth - statsColWidth * 2) / totalDays));
+  // 构建按周分组的数据
+  const weeks: number[][] = [];
+  let currentWeek: number[] = [];
   
-  // 构建日期行
-  let dateRow = `<th style="width: ${nameColWidth}px; min-width: ${nameColWidth}px;">姓名</th>`;
-  for (let day = 1; day <= totalDays; day++) {
-    const date = new Date(year, month - 1, day);
-    const dow = date.getDay();
-    const isWeekend = dow === 0 || dow === 6;
-    const bgColor = isWeekend ? '#fef3c7' : '#f3f4f6';
-    dateRow += `<th style="background-color: ${bgColor}; width: ${dateColWidth}px; min-width: ${dateColWidth}px; font-size: 9px; padding: 2px 1px;">${day}<br><span style="font-size: 8px; color: #6b7280;">${DAY_NAMES[dow]}</span></th>`;
+  // 填充第一周前面的空白
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    currentWeek.push(0); // 0 表示空白
   }
-  dateRow += `<th style="width: ${statsColWidth}px; min-width: ${statsColWidth}px; font-size: 9px;">工作</th><th style="width: ${statsColWidth}px; min-width: ${statsColWidth}px; font-size: 9px;">休息</th>`;
   
-  // 构建员工行
-  let employeeRows = '';
+  // 填充所有日期
+  for (let day = 1; day <= totalDays; day++) {
+    currentWeek.push(day);
+    if (currentWeek.length === 7) {
+      weeks.push(currentWeek);
+      currentWeek = [];
+    }
+  }
+  
+  // 填充最后一周的空白
+  if (currentWeek.length > 0) {
+    while (currentWeek.length < 7) {
+      currentWeek.push(0);
+    }
+    weeks.push(currentWeek);
+  }
+  
+  // 星期标题行
+  const dayHeaders = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  
+  // 构建每个员工的日历视图
+  let employeeCalendars = '';
+  
   results.forEach((result, idx) => {
     const bgColor = idx % 2 === 0 ? '#ffffff' : '#f9fafb';
-    employeeRows += `<tr style="background-color: ${bgColor};"><td style="font-weight: 600; text-align: left; padding-left: 6px; font-size: 10px; white-space: nowrap;">${result.employeeName}</td>`;
     
-    result.days.forEach((day) => {
-      let cellStyle = 'font-size: 9px; padding: 2px 1px;';
-      let cellContent = '';
-      
-      if (day.isRest) {
-        // 休息日
-        if (day.concurrentEmployees && day.concurrentEmployees.length > 1) {
-          cellStyle += 'background-color: #fef3c7; color: #92400e; font-weight: 500;';
-          cellContent = '休*';
-        } else {
-          cellStyle += 'background-color: #dcfce7; color: #166534; font-weight: 500;';
-          cellContent = '休';
-        }
-      } else {
-        // 工作日
-        cellStyle += 'background-color: #eff6ff; color: #1e40af;';
-        cellContent = '✓';
-      }
-      
-      employeeRows += `<td style="${cellStyle}">${cellContent}</td>`;
+    // 统计工作日和休息日
+    let workDays = 0;
+    let restDays = 0;
+    result.days.forEach(d => {
+      if (d.isWorkDay) workDays++;
+      else restDays++;
     });
     
-    employeeRows += `<td style="font-weight: 600; color: #1e40af; font-size: 10px;">${result.totalWorkDays}</td>`;
-    employeeRows += `<td style="font-weight: 600; color: #166534; font-size: 10px;">${result.totalRestDays}</td>`;
-    employeeRows += '</tr>';
+    // 员工标题
+    employeeCalendars += `
+      <div style="margin-bottom: 20px; page-break-inside: avoid;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 6px 10px; background: ${bgColor}; border-radius: 6px; border-left: 4px solid #3b82f6;">
+          <span style="font-weight: 600; font-size: 14px; color: #1e293b;">${result.employeeName}</span>
+          <span style="font-size: 11px; color: #64748b;">工作 ${workDays} 天 / 休息 ${restDays} 天</span>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+          <thead>
+            <tr>`;
+    
+    // 星期表头
+    dayHeaders.forEach((name, dayIdx) => {
+      const isWeekend = dayIdx === 0 || dayIdx === 6;
+      const headerBg = isWeekend ? '#fef3c7' : '#e5e7eb';
+      employeeCalendars += `<th style="width: 14.28%; padding: 6px 4px; background: ${headerBg}; font-size: 11px; color: #374151; border: 1px solid #d1d5db;">${name}</th>`;
+    });
+    
+    employeeCalendars += `</tr></thead><tbody>`;
+    
+    // 每周一行
+    weeks.forEach((week) => {
+      employeeCalendars += '<tr>';
+      week.forEach((day) => {
+        if (day === 0) {
+          // 空白单元格
+          employeeCalendars += '<td style="padding: 8px 4px; border: 1px solid #e5e7eb; background: #fafafa;"></td>';
+        } else {
+          const dayData = result.days[day - 1];
+          const isRest = dayData.isRest;
+          const isForceWork = dayData.isWorkDay && !dayData.isRest;
+          const hasConcurrent = dayData.concurrentEmployees && dayData.concurrentEmployees.length > 1;
+          
+          let cellBg = '#ffffff';
+          let textColor = '#374151';
+          let displayText = day.toString();
+          
+          if (isRest && hasConcurrent) {
+            cellBg = '#fef3c7';
+            textColor = '#92400e';
+            displayText = `${day}`;
+          } else if (isRest) {
+            cellBg = '#dcfce7';
+            textColor = '#166534';
+            displayText = `${day}`;
+          } else if (isForceWork) {
+            cellBg = '#f3f4f6';
+            textColor = '#6b7280';
+          }
+          
+          employeeCalendars += `<td style="padding: 8px 4px; border: 1px solid #d1d5db; background: ${cellBg}; text-align: center;">
+            <div style="font-size: 14px; font-weight: 500; color: ${textColor};">${displayText}</div>
+            ${isRest ? `<div style="font-size: 9px; color: ${textColor}; margin-top: 2px;">${hasConcurrent ? '休*' : '休'}</div>` : ''}
+          </td>`;
+        }
+      });
+      employeeCalendars += '</tr>';
+    });
+    
+    employeeCalendars += `</tbody></table></div>`;
   });
   
   // 构建不排休日说明
@@ -85,8 +139,8 @@ export function generateScheduleHTML(config: ScheduleConfig): string {
   }
   
   return `
-    <div style="text-align: center; margin-bottom: 15px;">
-      <h1 style="font-size: 20px; font-weight: bold; margin-bottom: 6px; color: #1e293b;">
+    <div style="text-align: center; margin-bottom: 20px;">
+      <h1 style="font-size: 22px; font-weight: bold; margin-bottom: 6px; color: #1e293b;">
         ${year}年${month}月 员工排班表
       </h1>
       <div style="font-size: 11px; color: #64748b;">
@@ -97,16 +151,7 @@ export function generateScheduleHTML(config: ScheduleConfig): string {
       </div>
     </div>
     
-    <table class="schedule-table" style="width: 100%; border-collapse: collapse; table-layout: fixed;">
-      <thead>
-        <tr style="background-color: #f3f4f6;">
-          ${dateRow}
-        </tr>
-      </thead>
-      <tbody>
-        ${employeeRows}
-      </tbody>
-    </table>
+    ${employeeCalendars}
     
     <div style="margin-top: 15px; font-size: 9px; color: #94a3b8; display: flex; gap: 15px; justify-content: center;">
       <div style="display: flex; align-items: center; gap: 3px;">
@@ -114,12 +159,12 @@ export function generateScheduleHTML(config: ScheduleConfig): string {
         <span>休息日</span>
       </div>
       <div style="display: flex; align-items: center; gap: 3px;">
-        <span style="display: inline-block; width: 12px; height: 12px; background-color: #eff6ff; border: 1px solid #bfdbfe;"></span>
-        <span>工作日</span>
-      </div>
-      <div style="display: flex; align-items: center; gap: 3px;">
         <span style="display: inline-block; width: 12px; height: 12px; background-color: #fef3c7; border: 1px solid #fde68a;"></span>
         <span>多人同休</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 3px;">
+        <span style="display: inline-block; width: 12px; height: 12px; background-color: #f3f4f6; border: 1px solid #d1d5db;"></span>
+        <span>强制工作</span>
       </div>
     </div>
     
@@ -130,7 +175,7 @@ export function generateScheduleHTML(config: ScheduleConfig): string {
 }
 
 /**
- * 导出为PDF（横向 A4）
+ * 导出为PDF（日历格式，纵向 A4）
  */
 export async function exportToPDF(config: ScheduleConfig): Promise<void> {
   // 创建临时容器
@@ -140,9 +185,9 @@ export async function exportToPDF(config: ScheduleConfig): Promise<void> {
     position: fixed;
     left: -9999px;
     top: 0;
-    width: 297mm;
+    width: 210mm;
     background: white;
-    padding: 10mm 15mm;
+    padding: 15mm;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   `;
   container.innerHTML = generateScheduleHTML(config);
@@ -160,15 +205,15 @@ export async function exportToPDF(config: ScheduleConfig): Promise<void> {
       backgroundColor: '#ffffff',
     });
     
-    // 创建PDF（横向 A4 尺寸）
+    // 创建PDF（纵向 A4 尺寸）
     const pdf = new jsPDF({
-      orientation: 'landscape',
+      orientation: 'portrait',
       unit: 'mm',
       format: 'a4',
     });
     
-    const pageWidth = 297; // 横向 A4 宽度
-    const pageHeight = 210; // 横向 A4 高度
+    const pageWidth = 210; // A4 宽度
+    const pageHeight = 297; // A4 高度
     
     const imgWidth = pageWidth;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
