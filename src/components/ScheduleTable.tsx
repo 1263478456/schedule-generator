@@ -1,18 +1,17 @@
 import type { ScheduleConfig } from '../types';
 import { DAY_NAMES } from '../types';
-import { generateOptimizedSchedule } from '../utils/scheduleGenerator';
+import { generateSmartSchedule } from '../utils/scheduleGenerator';
 
 interface ScheduleTableProps {
   config: ScheduleConfig;
 }
 
 export default function ScheduleTable({ config }: ScheduleTableProps) {
-  const { results, stats } = generateOptimizedSchedule(config);
+  const { results, stats, conflicts } = generateSmartSchedule(config);
   const { year, month } = config;
   
   const totalDays = new Date(year, month, 0).getDate();
   
-  // 生成日期数组
   const dates = Array.from({ length: totalDays }, (_, i) => {
     const day = i + 1;
     const date = new Date(year, month - 1, day);
@@ -51,6 +50,10 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
             <span className="w-3 h-3 rounded bg-gray-100 border border-gray-200"></span>
             <span className="text-gray-600">不排休</span>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded bg-amber-100 border border-amber-200"></span>
+            <span className="text-gray-600">多人同休</span>
+          </div>
         </div>
       </div>
 
@@ -62,17 +65,34 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
         </div>
         <div className="bg-green-50 rounded-lg p-3 text-center">
           <div className="text-2xl font-bold text-green-600">{stats.restDaysPerEmployee}</div>
-          <div className="text-xs text-green-500">每人休息天数</div>
+          <div className="text-xs text-green-500">平均休息天数</div>
         </div>
         <div className="bg-purple-50 rounded-lg p-3 text-center">
           <div className="text-2xl font-bold text-purple-600">{stats.workDaysPerEmployee}</div>
-          <div className="text-xs text-purple-500">每人工作天数</div>
+          <div className="text-xs text-purple-500">平均工作天数</div>
         </div>
-        <div className="bg-gray-50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-gray-600">{stats.noRestDaysCount}</div>
-          <div className="text-xs text-gray-500">不排休日</div>
+        <div className="bg-amber-50 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold text-amber-600">{stats.maxConcurrentRest}</div>
+          <div className="text-xs text-amber-500">最大同时休息</div>
         </div>
       </div>
+
+      {/* 冲突警告 */}
+      {conflicts.length > 0 && (
+        <div className="mb-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+          <div className="flex items-center gap-2 mb-2">
+            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="font-medium text-amber-800">排班冲突提示</span>
+          </div>
+          <div className="text-sm text-amber-700 space-y-1">
+            {conflicts.map((conflict, idx) => (
+              <div key={idx}>• {conflict.message}</div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 排班表格 */}
       <div className="overflow-x-auto">
@@ -95,6 +115,7 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
               ))}
               <th className="px-2 py-2 text-center font-medium text-blue-600 min-w-[50px]">工作</th>
               <th className="px-2 py-2 text-center font-medium text-green-600 min-w-[50px]">休息</th>
+              <th className="px-2 py-2 text-center font-medium text-amber-600 min-w-[50px]">同休</th>
             </tr>
           </thead>
           <tbody>
@@ -113,30 +134,44 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
                     {result.employeeName}
                   </div>
                 </td>
-                {result.days.map((day, dayIdx) => (
-                  <td
-                    key={dayIdx}
-                    className={`px-1 py-2.5 text-center text-xs font-medium ${
-                      day.isNoAssign
-                        ? 'bg-gray-100 text-gray-400'
-                        : day.isRest
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-blue-50 text-blue-600'
-                    }`}
-                  >
-                    {day.isNoAssign ? '—' : day.isRest ? '休' : '✓'}
-                  </td>
-                ))}
+                {result.days.map((day, dayIdx) => {
+                  const hasConcurrent = day.concurrentEmployees && day.concurrentEmployees.length > 1;
+                  return (
+                    <td
+                      key={dayIdx}
+                      className={`px-1 py-2.5 text-center text-xs font-medium ${
+                        day.isNoAssign
+                          ? 'bg-gray-100 text-gray-400'
+                          : day.isRest
+                          ? hasConcurrent
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-green-100 text-green-700'
+                          : 'bg-blue-50 text-blue-600'
+                      }`}
+                      title={hasConcurrent ? `同休: ${day.concurrentEmployees?.join(', ')}` : undefined}
+                    >
+                      {day.isNoAssign ? '—' : day.isRest ? (hasConcurrent ? '休*' : '休') : '✓'}
+                    </td>
+                  );
+                })}
                 <td className="px-2 py-2.5 text-center font-semibold text-blue-600">
                   {result.totalWorkDays}
                 </td>
                 <td className="px-2 py-2.5 text-center font-semibold text-green-600">
                   {result.totalRestDays}
                 </td>
+                <td className="px-2 py-2.5 text-center font-semibold text-amber-600">
+                  {result.concurrentRestDays}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* 图例说明 */}
+      <div className="mt-4 text-xs text-gray-500">
+        <span className="text-amber-600">休*</span> 表示多人同一天休息，鼠标悬停可查看详情
       </div>
     </div>
   );

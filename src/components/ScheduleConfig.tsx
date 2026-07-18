@@ -1,22 +1,25 @@
 import { useState } from 'react';
-import type { ScheduleConfig as ScheduleConfigType } from '../types';
-import { DAY_NAMES_FULL, MONTH_NAMES } from '../types';
+import type { ScheduleConfig as ScheduleConfigType, ScheduleStrategy, ConflictResolution } from '../types';
+import { DAY_NAMES_FULL, MONTH_NAMES, DEFAULT_SCHEDULE_STRATEGY } from '../types';
 
 interface ScheduleConfigProps {
   config: ScheduleConfigType;
   onChange: (config: ScheduleConfigType) => void;
 }
 
-const WEEKDAY_OPTIONS = [0, 1, 2, 3, 4, 5, 6].map(d => ({
-  value: d,
-  label: DAY_NAMES_FULL[d],
-}));
-
 export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps) {
   const [newRestDate, setNewRestDate] = useState('');
+  const [showStrategy, setShowStrategy] = useState(false);
 
   const updateConfig = (updates: Partial<ScheduleConfigType>) => {
     onChange({ ...config, ...updates });
+  };
+
+  const updateStrategy = (updates: Partial<ScheduleStrategy>) => {
+    const currentStrategy = config.scheduleStrategy || DEFAULT_SCHEDULE_STRATEGY;
+    updateConfig({
+      scheduleStrategy: { ...currentStrategy, ...updates },
+    });
   };
 
   const toggleNoRestDayOfWeek = (day: number) => {
@@ -38,10 +41,18 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
     updateConfig({ noRestDates: config.noRestDates.filter(d => d !== date) });
   };
 
-  // 生成年份和月份选项
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  const strategy = config.scheduleStrategy || DEFAULT_SCHEDULE_STRATEGY;
+
+  const conflictOptions: { value: ConflictResolution; label: string; description: string }[] = [
+    { value: 'allow', label: '允许', description: '不做处理，允许多人同休' },
+    { value: 'notify', label: '提示', description: '显示警告但继续排班' },
+    { value: 'redistribute', label: '重新分配', description: '尝试调整让更少人同休' },
+    { value: 'block', label: '阻止', description: '停止排班并要求修改配置' },
+  ];
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -90,7 +101,7 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
 
       {/* 每周休息天数 */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">每周休息天数</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">每周休息天数（默认）</label>
         <div className="flex items-center gap-4">
           <input
             type="range"
@@ -104,7 +115,7 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
             <span className="text-xl font-bold text-purple-600">{config.weeklyRestDays}</span>
           </div>
         </div>
-        <p className="mt-1 text-xs text-gray-500">建议设置 1-2 天</p>
+        <p className="mt-1 text-xs text-gray-500">此值作为员工的默认休息天数，可在员工管理中为个人单独设置</p>
       </div>
 
       {/* 不排休的星期几 */}
@@ -112,13 +123,13 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
         <label className="block text-sm font-medium text-gray-700 mb-2">不排休的星期几</label>
         <p className="text-xs text-gray-500 mb-3">选中的日期所有员工都工作</p>
         <div className="grid grid-cols-7 gap-2">
-          {WEEKDAY_OPTIONS.map(({ value }) => {
-            const isSelected = config.noRestDaysOfWeek.includes(value);
-            const dayShort = DAY_NAMES_FULL[value].replace('星期', '周');
+          {DAY_NAMES_FULL.map((name, index) => {
+            const isSelected = config.noRestDaysOfWeek.includes(index);
+            const dayShort = name.replace('星期', '周');
             return (
               <button
-                key={value}
-                onClick={() => toggleNoRestDayOfWeek(value)}
+                key={index}
+                onClick={() => toggleNoRestDayOfWeek(index)}
                 className={`py-2 px-1 rounded-lg text-sm font-medium transition-all ${
                   isSelected
                     ? 'bg-purple-600 text-white shadow-md'
@@ -133,7 +144,7 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
       </div>
 
       {/* 不排休的具体日期 */}
-      <div className="mb-4">
+      <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">不排休的具体日期</label>
         <p className="text-xs text-gray-500 mb-3">添加特殊日期（如节假日），这些日期所有员工都工作</p>
         <div className="flex gap-2 mb-3">
@@ -170,6 +181,156 @@ export default function ScheduleConfig({ config, onChange }: ScheduleConfigProps
                 </button>
               </span>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* 不排休日的类型 */}
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          不排休日的类型
+        </label>
+        <p className="text-xs text-gray-500 mb-3">
+          设置上面选中的"不排休"日期算作什么类型的日
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => updateConfig({ noRestDayType: 'work' })}
+            className={`p-4 rounded-lg border-2 transition-all text-left ${
+              config.noRestDayType === 'work'
+                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span className="font-medium">工作日</span>
+            </div>
+            <p className="text-xs opacity-75">
+              不排休日 = 员工需要上班<br/>
+              适合：法定工作日、特殊营业日
+            </p>
+          </button>
+          <button
+            onClick={() => updateConfig({ noRestDayType: 'rest' })}
+            className={`p-4 rounded-lg border-2 transition-all text-left ${
+              config.noRestDayType === 'rest'
+                ? 'border-green-500 bg-green-50 text-green-700'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <span className="font-medium">休息日</span>
+            </div>
+            <p className="text-xs opacity-75">
+              不排休日 = 所有人自动休息<br/>
+              适合：周末、节假日
+            </p>
+          </button>
+        </div>
+        <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
+          <p className="text-xs text-gray-600">
+            💡 <strong>当前设置：{config.noRestDayType === 'work' ? '工作日' : '休息日'}</strong>
+            {config.noRestDayType === 'work' ? (
+              <> — 选中的日期（如周六、周日）员工需要上班，这些天不会被安排休息</>
+            ) : (
+              <> — 选中的日期（如周六、周日）所有人自动休息，不会被安排排班</>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* 排班策略设置 */}
+      <div className="border-t border-gray-100 pt-6">
+        <button
+          onClick={() => setShowStrategy(!showStrategy)}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <span className="text-sm font-medium text-gray-700">高级排班策略</span>
+          </div>
+          <svg 
+            className={`w-5 h-5 text-gray-400 transition-transform ${showStrategy ? 'rotate-180' : ''}`}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {showStrategy && (
+          <div className="mt-4 space-y-4">
+            {/* 避免多人同时休息 */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-gray-700">避免多人同时休息</p>
+                <p className="text-xs text-gray-500">尽量分散员工的休息日</p>
+              </div>
+              <button
+                onClick={() => updateStrategy({ avoidMultipleRest: !strategy.avoidMultipleRest })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  strategy.avoidMultipleRest ? 'bg-indigo-600' : 'bg-gray-300'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  strategy.avoidMultipleRest ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+
+            {/* 最大同时休息人数 */}
+            {strategy.avoidMultipleRest && (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  允许同时休息的最大人数
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="1"
+                    max="5"
+                    value={strategy.maxConcurrentRest}
+                    onChange={(e) => updateStrategy({ maxConcurrentRest: parseInt(e.target.value) })}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                  />
+                  <div className="w-12 h-8 flex items-center justify-center bg-indigo-50 rounded-lg">
+                    <span className="text-lg font-bold text-indigo-600">{strategy.maxConcurrentRest}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 冲突解决方式 */}
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                无法避免多人同休时的处理方式
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {conflictOptions.map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => updateStrategy({ conflictResolution: option.value })}
+                    className={`p-2 rounded-lg text-left text-sm transition-all ${
+                      strategy.conflictResolution === option.value
+                        ? 'bg-indigo-100 border-2 border-indigo-500 text-indigo-700'
+                        : 'bg-white border-2 border-gray-200 text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="font-medium">{option.label}</div>
+                    <div className="text-xs opacity-75">{option.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -10,6 +10,7 @@ import ExportPanel from './components/ExportPanel';
 import ErrorBoundary from './components/ErrorBoundary';
 import ConfirmDialog from './components/ConfirmDialog';
 import HistoryPanel from './components/HistoryPanel';
+import Login from './components/Login';
 import { ToastContainer, useToast } from './components/Toast';
 import { APP_VERSION } from './utils/version';
 
@@ -23,10 +24,25 @@ const defaultConfig: ScheduleConfigType = {
   noRestDaysOfWeek: [0, 6],
   noRestDates: [],
   employees: [],
+  noRestDayType: 'work',
+  scheduleStrategy: {
+    avoidMultipleRest: true,
+    maxConcurrentRest: 1,
+    conflictResolution: 'notify',
+  },
 };
+
+interface User {
+  id: number;
+  username: string;
+  displayName: string;
+  role: string;
+}
 
 function App() {
   const { toasts, removeToast, success, error, warning } = useToast();
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [config, setConfig] = useState<ScheduleConfigType>(defaultConfig);
   const [activeTab, setActiveTab] = useState<'config' | 'preview'>('config');
   const [showHistory, setShowHistory] = useState(false);
@@ -34,8 +50,27 @@ function App() {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // 检查本地存储的登录状态
+  useEffect(() => {
+    const savedToken = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    
+    if (savedToken && savedUser) {
+      try {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    }
+    setIsLoading(false);
+  }, []);
+
   // 从服务器加载配置
   useEffect(() => {
+    if (!user || !token) return;
+
     const loadConfig = async () => {
       try {
         const savedConfig = await getConfig();
@@ -46,21 +81,20 @@ function App() {
           noRestDaysOfWeek: savedConfig.noRestDaysOfWeek,
           noRestDates: savedConfig.noRestDates,
           employees: savedConfig.employees,
+          noRestDayType: (savedConfig as any).noRestDayType || 'work',
+          scheduleStrategy: (savedConfig as any).scheduleStrategy || defaultConfig.scheduleStrategy,
         });
       } catch (err) {
         console.error('加载配置失败:', err);
-        // 使用默认配置
-      } finally {
-        setIsLoading(false);
       }
     };
 
     loadConfig();
-  }, []);
+  }, [user, token]);
 
   // 保存配置到服务器
   useEffect(() => {
-    if (isLoading) return; // 加载中不保存
+    if (isLoading || !user || !token) return;
 
     const saveConfigToServer = async () => {
       try {
@@ -70,13 +104,25 @@ function App() {
       }
     };
 
-    // 防抖保存
     const timer = setTimeout(saveConfigToServer, 500);
     return () => clearTimeout(timer);
-  }, [config, isLoading]);
+  }, [config, isLoading, user, token]);
+
+  const handleLogin = useCallback((userData: User, tokenStr: string) => {
+    setUser(userData);
+    setToken(tokenStr);
+    success(`欢迎回来，${userData.displayName || userData.username}！`);
+  }, [success]);
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setToken(null);
+    success('已退出登录');
+  }, [success]);
 
   const handleConfigChange = useCallback((newConfig: ScheduleConfigType) => {
-    // 验证配置
     const validation = validateScheduleConfig(newConfig);
     
     if (!validation.valid) {
@@ -85,7 +131,6 @@ function App() {
       setValidationErrors([]);
     }
     
-    // 显示警告
     if (validation.warnings.length > 0) {
       validation.warnings.forEach(w => warning(w.message));
     }
@@ -150,8 +195,6 @@ function App() {
     success('配置已重置');
   }, [success]);
 
-  const hasEmployees = config.employees.length > 0;
-
   // 加载中状态
   if (isLoading) {
     return (
@@ -163,6 +206,13 @@ function App() {
       </div>
     );
   }
+
+  // 未登录，显示登录页面
+  if (!user || !token) {
+    return <Login onLogin={handleLogin} />;
+  }
+
+  const hasEmployees = config.employees.length > 0;
 
   return (
     <ErrorBoundary>
@@ -179,7 +229,7 @@ function App() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-800">智能排班表生成器</h1>
-                  <p className="text-xs text-gray-500">v{APP_VERSION} · 数据已同步到服务器</p>
+                  <p className="text-xs text-gray-500">v{APP_VERSION} · {user.displayName || user.username}</p>
                 </div>
               </div>
               
@@ -193,6 +243,16 @@ function App() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <span className="hidden sm:inline">历史</span>
+                </button>
+                
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span className="hidden sm:inline">退出</span>
                 </button>
                 
                 {/* 移动端标签切换 */}

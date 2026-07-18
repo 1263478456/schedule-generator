@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Employee } from '../types';
+import type { Employee, EmployeeRestConfig } from '../types';
 import { validateEmployee, escapeHtml } from '../utils/validation';
 
 interface EmployeeManagerProps {
@@ -11,6 +11,7 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [configuringId, setConfiguringId] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
 
   const addEmployee = () => {
@@ -24,6 +25,10 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
     const newEmployee: Employee = {
       id: Date.now().toString(),
       name: newName.trim(),
+      restConfig: {
+        minRestDays: 0,
+        maxRestDays: 10,
+      },
     };
     onChange([...employees, newEmployee]);
     setNewName('');
@@ -46,7 +51,6 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
   const saveEditing = () => {
     if (!editingId) return;
     
-    // 验证（排除当前编辑的员工）
     const otherEmployees = employees.filter(e => e.id !== editingId);
     const validationErrors = validateEmployee(editingName, otherEmployees);
     
@@ -71,6 +75,29 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
     setErrors([]);
   };
 
+  const updateRestConfig = (employeeId: string, config: Partial<EmployeeRestConfig>) => {
+    onChange(
+      employees.map(e => {
+        if (e.id === employeeId) {
+          const currentConfig = e.restConfig || { minRestDays: 0, maxRestDays: 10 };
+          const newConfig = { ...currentConfig, ...config };
+          
+          // 确保 minRest <= maxRest
+          if (newConfig.minRestDays > newConfig.maxRestDays) {
+            if (config.minRestDays !== undefined) {
+              newConfig.maxRestDays = newConfig.minRestDays;
+            } else {
+              newConfig.minRestDays = newConfig.maxRestDays;
+            }
+          }
+          
+          return { ...e, restConfig: newConfig };
+        }
+        return e;
+      })
+    );
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       if (editingId) {
@@ -88,12 +115,12 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
           <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         </div>
         <div>
           <h2 className="text-lg font-semibold text-gray-800">员工管理</h2>
-          <p className="text-sm text-gray-500">添加、编辑或删除员工信息</p>
+          <p className="text-sm text-gray-500">添加、编辑员工，配置个人休息天数</p>
         </div>
       </div>
 
@@ -135,7 +162,7 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
       )}
 
       {/* 员工列表 */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {employees.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
             <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -144,80 +171,157 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
             <p className="text-sm">暂无员工，请添加员工信息</p>
           </div>
         ) : (
-          employees.map((employee) => (
-            <div
-              key={employee.id}
-              className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
-            >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-                {escapeHtml(employee.name.charAt(0))}
-              </div>
-              
-              {editingId === employee.id ? (
-                <input
-                  type="text"
-                  value={editingName}
-                  onChange={(e) => {
-                    setEditingName(e.target.value);
-                    if (errors.length > 0) setErrors([]);
-                  }}
-                  onKeyDown={handleKeyDown}
-                  onBlur={saveEditing}
-                  autoFocus
-                  maxLength={20}
-                  className="flex-1 px-3 py-1.5 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <span className="flex-1 font-medium text-gray-700 truncate">{escapeHtml(employee.name)}</span>
-              )}
+          employees.map((employee) => {
+            const restConfig = employee.restConfig || { minRestDays: 0, maxRestDays: 10 };
+            const isConfiguring = configuringId === employee.id;
+            
+            return (
+              <div
+                key={employee.id}
+                className="bg-gray-50 rounded-lg overflow-hidden"
+              >
+                {/* 员工基本信息行 */}
+                <div className="flex items-center gap-3 p-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                    {escapeHtml(employee.name.charAt(0))}
+                  </div>
+                  
+                  {editingId === employee.id ? (
+                    <input
+                      type="text"
+                      value={editingName}
+                      onChange={(e) => {
+                        setEditingName(e.target.value);
+                        if (errors.length > 0) setErrors([]);
+                      }}
+                      onKeyDown={handleKeyDown}
+                      onBlur={saveEditing}
+                      autoFocus
+                      maxLength={20}
+                      className="flex-1 px-3 py-1.5 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  ) : (
+                    <div className="flex-1">
+                      <span className="font-medium text-gray-700">{escapeHtml(employee.name)}</span>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        最少休息 {restConfig.minRestDays} 天 / 最多休息 {restConfig.maxRestDays} 天
+                      </div>
+                    </div>
+                  )}
 
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                {editingId === employee.id ? (
-                  <>
-                    <button
-                      onClick={saveEditing}
-                      className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors"
-                      title="保存 (Enter)"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={cancelEditing}
-                      className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md transition-colors"
-                      title="取消 (Esc)"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => startEditing(employee)}
-                      className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                      title="编辑"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => removeEmployee(employee.id)}
-                      className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                      title="删除"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </>
+                  <div className="flex items-center gap-1">
+                    {editingId === employee.id ? (
+                      <>
+                        <button
+                          onClick={saveEditing}
+                          className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                          title="保存 (Enter)"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={cancelEditing}
+                          className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md transition-colors"
+                          title="取消 (Esc)"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setConfiguringId(isConfiguring ? null : employee.id)}
+                          className={`p-1.5 rounded-md transition-colors ${
+                            isConfiguring 
+                              ? 'text-indigo-600 bg-indigo-50' 
+                              : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50'
+                          }`}
+                          title="设置休息天数"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => startEditing(employee)}
+                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                          title="编辑"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => removeEmployee(employee.id)}
+                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          title="删除"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* 休息天数配置面板 */}
+                {isConfiguring && (
+                  <div className="px-3 pb-3 pt-1 border-t border-gray-200">
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* 最少休息天数 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          最少休息天数
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="0"
+                            max="15"
+                            value={restConfig.minRestDays}
+                            onChange={(e) => updateRestConfig(employee.id, { minRestDays: parseInt(e.target.value) })}
+                            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                          />
+                          <span className="w-8 text-center text-sm font-medium text-indigo-600">
+                            {restConfig.minRestDays}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* 最多休息天数 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          最多休息天数
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="0"
+                            max="15"
+                            value={restConfig.maxRestDays}
+                            onChange={(e) => updateRestConfig(employee.id, { maxRestDays: parseInt(e.target.value) })}
+                            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                          />
+                          <span className="w-8 text-center text-sm font-medium text-indigo-600">
+                            {restConfig.maxRestDays}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-2 text-xs text-gray-500">
+                      💡 最少休息天数必须满足，最多休息天数会在资源允许时尽量满足。
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
