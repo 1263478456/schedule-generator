@@ -34,12 +34,11 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 export interface ConfigData {
   year: number;
   month: number;
-  weeklyRestDays: number;
+  monthlyRestDays?: number;
   noRestDaysOfWeek: number[];
   noRestDates: string[];
   employees: ScheduleConfig['employees'];
-  scheduleStrategy?: any;
-  noRestDayType?: string;
+  maxConcurrentRest?: number;
   randomness?: { enabled: boolean; intensity: number };
 }
 

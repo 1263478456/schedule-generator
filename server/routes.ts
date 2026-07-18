@@ -19,12 +19,11 @@ router.get('/config', authMiddleware, (req, res) => {
     res.json({
       year: config.year,
       month: config.month,
-      weeklyRestDays: config.weekly_rest_days,
+      monthlyRestDays: config.monthly_rest_days || 4,
       noRestDaysOfWeek: JSON.parse(config.no_rest_days_of_week || '[]'),
       noRestDates: JSON.parse(config.no_rest_dates || '[]'),
       employees: JSON.parse(config.employees || '[]'),
-      scheduleStrategy: JSON.parse(config.schedule_strategy || '{}'),
-      noRestDayType: config.no_rest_day_type || 'work',
+      maxConcurrentRest: config.max_concurrent_rest || 2,
       randomness: JSON.parse(config.randomness || '{"enabled":true,"intensity":30}'),
       updatedAt: config.updated_at,
     });
@@ -37,18 +36,17 @@ router.get('/config', authMiddleware, (req, res) => {
 // 保存配置（需要登录）
 router.put('/config', authMiddleware, (req, res) => {
   try {
-    const { year, month, weeklyRestDays, noRestDaysOfWeek, noRestDates, employees, scheduleStrategy, noRestDayType, randomness } = req.body;
+    const { year, month, monthlyRestDays, noRestDaysOfWeek, noRestDates, employees, maxConcurrentRest, randomness } = req.body;
     
     const stmt = db.prepare(`
       UPDATE config SET
         year = ?,
         month = ?,
-        weekly_rest_days = ?,
+        monthly_rest_days = ?,
         no_rest_days_of_week = ?,
         no_rest_dates = ?,
         employees = ?,
-        schedule_strategy = ?,
-        no_rest_day_type = ?,
+        max_concurrent_rest = ?,
         randomness = ?,
         updated_at = datetime('now')
       WHERE id = 1
@@ -57,12 +55,11 @@ router.put('/config', authMiddleware, (req, res) => {
     stmt.run(
       year,
       month,
-      weeklyRestDays,
+      monthlyRestDays || 4,
       JSON.stringify(noRestDaysOfWeek || []),
       JSON.stringify(noRestDates || []),
       JSON.stringify(employees || []),
-      JSON.stringify(scheduleStrategy || {}),
-      noRestDayType || 'work',
+      maxConcurrentRest || 2,
       JSON.stringify(randomness || { enabled: true, intensity: 30 })
     );
     

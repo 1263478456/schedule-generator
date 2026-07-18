@@ -5,10 +5,11 @@ import { REST_PREFERENCE_OPTIONS } from '../types';
 
 interface EmployeeManagerProps {
   employees: Employee[];
+  defaultMonthlyRestDays: number;
   onChange: (employees: Employee[]) => void;
 }
 
-export default function EmployeeManager({ employees, onChange }: EmployeeManagerProps) {
+export default function EmployeeManager({ employees, defaultMonthlyRestDays, onChange }: EmployeeManagerProps) {
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -27,9 +28,10 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
       id: Date.now().toString(),
       name: newName.trim(),
       restConfig: {
-        minRestDays: 0,
-        maxRestDays: 10,
+        minRestDays: defaultMonthlyRestDays,
+        maxRestDays: defaultMonthlyRestDays,
       },
+      restPreference: 'scattered',
     };
     onChange([...employees, newEmployee]);
     setNewName('');
@@ -80,7 +82,7 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
     onChange(
       employees.map(e => {
         if (e.id === employeeId) {
-          const currentConfig = e.restConfig || { minRestDays: 0, maxRestDays: 10 };
+          const currentConfig = e.restConfig || { minRestDays: defaultMonthlyRestDays, maxRestDays: defaultMonthlyRestDays };
           const newConfig = { ...currentConfig, ...config };
           
           if (newConfig.minRestDays > newConfig.maxRestDays) {
@@ -131,7 +133,7 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
         </div>
         <div>
           <h2 className="text-lg font-semibold text-gray-800">员工管理</h2>
-          <p className="text-sm text-gray-500">添加、编辑员工，配置个人休息天数</p>
+          <p className="text-sm text-gray-500">添加员工，配置个人休息天数和偏好</p>
         </div>
       </div>
 
@@ -183,7 +185,7 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
           </div>
         ) : (
           employees.map((employee) => {
-            const restConfig = employee.restConfig || { minRestDays: 0, maxRestDays: 10 };
+            const restConfig = employee.restConfig || { minRestDays: defaultMonthlyRestDays, maxRestDays: defaultMonthlyRestDays };
             const isConfiguring = configuringId === employee.id;
             
             return (
@@ -215,7 +217,9 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
                     <div className="flex-1">
                       <span className="font-medium text-gray-700">{escapeHtml(employee.name)}</span>
                       <div className="text-xs text-gray-500 mt-0.5">
-                        最少休息 {restConfig.minRestDays} 天 / 最多休息 {restConfig.maxRestDays} 天
+                        月休 {restConfig.minRestDays}-{restConfig.maxRestDays} 天 · 
+                        {employee.restPreference === 'consecutive' ? ' 连休' : 
+                         employee.restPreference === 'random' ? ' 随机' : ' 分散'}
                       </div>
                     </div>
                   )}
@@ -226,7 +230,7 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
                         <button
                           onClick={saveEditing}
                           className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors"
-                          title="保存 (Enter)"
+                          title="保存"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -235,7 +239,7 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
                         <button
                           onClick={cancelEditing}
                           className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md transition-colors"
-                          title="取消 (Esc)"
+                          title="取消"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -254,7 +258,8 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
                           title="设置休息天数"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
                         </button>
                         <button
@@ -348,7 +353,7 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
                     </div>
                     
                     <div className="mt-2 text-xs text-gray-500">
-                      💡 连休偏好会安排连续的休息日，分散偏好会均匀分布休息日。
+                      💡 设为 0 表示该员工本月不想休息
                     </div>
                   </div>
                 )}
@@ -362,9 +367,6 @@ export default function EmployeeManager({ employees, onChange }: EmployeeManager
       {employees.length > 0 && (
         <div className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-500">
           共 {employees.length} 名员工
-          {employees.length > 30 && (
-            <span className="text-amber-600 ml-2">（员工较多，可能影响排班效果）</span>
-          )}
         </div>
       )}
     </div>

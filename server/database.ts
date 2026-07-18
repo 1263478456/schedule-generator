@@ -47,18 +47,8 @@ function columnExists(tableName: string, columnName: string): boolean {
 }
 
 // 删除旧表（如果存在但 schema 不匹配）
-if (tableExists('config') && !columnExists('config', 'schedule_strategy')) {
+if (tableExists('config') && !columnExists('config', 'monthly_rest_days')) {
   console.log('⚠️  检测到旧版 config 表，正在重建...');
-  db.exec('DROP TABLE IF EXISTS config');
-}
-
-if (tableExists('config') && !columnExists('config', 'no_rest_day_type')) {
-  console.log('⚠️  检测到旧版 config 表，正在重建...');
-  db.exec('DROP TABLE IF EXISTS config');
-}
-
-if (tableExists('config') && !columnExists('config', 'randomness')) {
-  console.log('⚠️  检测到旧版 config 表（缺少 randomness），正在重建...');
   db.exec('DROP TABLE IF EXISTS config');
 }
 
@@ -80,12 +70,11 @@ db.exec(`
     id INTEGER PRIMARY KEY DEFAULT 1,
     year INTEGER NOT NULL,
     month INTEGER NOT NULL,
-    weekly_rest_days INTEGER NOT NULL DEFAULT 1,
+    monthly_rest_days INTEGER NOT NULL DEFAULT 4,
     no_rest_days_of_week TEXT NOT NULL DEFAULT '[]',
     no_rest_dates TEXT NOT NULL DEFAULT '[]',
     employees TEXT NOT NULL DEFAULT '[]',
-    schedule_strategy TEXT NOT NULL DEFAULT '{}',
-    no_rest_day_type TEXT NOT NULL DEFAULT 'work',
+    max_concurrent_rest INTEGER NOT NULL DEFAULT 2,
     randomness TEXT NOT NULL DEFAULT '{"enabled":true,"intensity":30}',
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -119,8 +108,8 @@ if (!adminExists) {
 
 // 初始化默认配置
 const initConfig = db.prepare(`
-  INSERT OR IGNORE INTO config (id, year, month, weekly_rest_days, no_rest_days_of_week, no_rest_dates, employees, schedule_strategy, no_rest_day_type, randomness)
-  VALUES (1, ?, ?, 1, '[]', '[]', '[]', '{}', 'work', '{"enabled":true,"intensity":30}')
+  INSERT OR IGNORE INTO config (id, year, month, monthly_rest_days, no_rest_days_of_week, no_rest_dates, employees, max_concurrent_rest, randomness)
+  VALUES (1, ?, ?, 4, '[]', '[]', '[]', 2, '{"enabled":true,"intensity":30}')
 `);
 
 const currentYear = new Date().getFullYear();

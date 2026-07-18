@@ -138,7 +138,7 @@ export default function HistoryPanel({ onLoadHistory, onClose }: HistoryPanelPro
                         <span className="text-xs text-gray-500">{formatDate(item.createdAt)}</span>
                       </div>
                       <div className="text-sm text-gray-600">
-                        {item.config.year}年{item.config.month}月 | {item.stats.employeesCount}名员工 | 每周休息{item.config.weeklyRestDays}天
+                        {item.config.year}年{item.config.month}月 | {item.stats.employeesCount}名员工 | 月休{(item.config as any).monthlyRestDays || 4}天
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
                         工作{item.stats.workDaysPerEmployee}天 / 休息{item.stats.restDaysPerEmployee}天

@@ -2,7 +2,7 @@
 export interface Employee {
   id: string;
   name: string;
-  // 个人休息天数配置
+  // 个人休息配置（覆盖全局默认值）
   restConfig?: EmployeeRestConfig;
   // 休息偏好
   restPreference?: RestPreference;
@@ -10,7 +10,7 @@ export interface Employee {
 
 // 员工个人休息配置
 export interface EmployeeRestConfig {
-  // 本月最少休息天数（必须满足）
+  // 本月最少休息天数（设为0表示不想休息）
   minRestDays: number;
   // 本月最多休息天数
   maxRestDays: number;
@@ -19,27 +19,22 @@ export interface EmployeeRestConfig {
 // 休息偏好
 export type RestPreference = 'consecutive' | 'scattered' | 'random';
 
-// 不排休日的类型
-export type NoRestDayType = 'work' | 'rest';
-
 // 排班规则
 export interface ScheduleConfig {
   // 排班月份
   year: number;
   month: number;
-  // 每周休息天数
-  weeklyRestDays: number;
-  // 不排休的星期几（0=周日, 1=周一, ..., 6=周六）
+  // 每月休息天数（全局默认值）
+  monthlyRestDays: number;
+  // 不排休的星期几（0=周日, 1=周一, ..., 6=周六）- 这些天强制工作
   noRestDaysOfWeek: number[];
-  // 不排休的具体日期（格式: "YYYY-MM-DD"）
+  // 不排休的具体日期（格式: "YYYY-MM-DD"）- 这些天强制工作
   noRestDates: string[];
   // 员工列表
   employees: Employee[];
-  // 全局排班策略
-  scheduleStrategy: ScheduleStrategy;
-  // 不排休日的类型：'work' 表示工作日，'rest' 表示休息日
-  noRestDayType: NoRestDayType;
-  // 全局随机性设置
+  // 最大同时休息人数
+  maxConcurrentRest: number;
+  // 随机性配置
   randomness: RandomnessConfig;
 }
 
@@ -50,23 +45,6 @@ export interface RandomnessConfig {
   // 随机强度 (0-100)
   intensity: number;
 }
-
-// 排班策略
-export interface ScheduleStrategy {
-  // 避免多人同时休息
-  avoidMultipleRest: boolean;
-  // 允许同时休息的最大人数
-  maxConcurrentRest: number;
-  // 无法避免时的处理方式
-  conflictResolution: ConflictResolution;
-}
-
-// 冲突解决方式
-export type ConflictResolution = 
-  | 'allow'           // 允许（不做处理）
-  | 'notify'          // 提示但继续
-  | 'redistribute'    // 尝试重新分配
-  | 'block';          // 阻止并要求修改
 
 // 排班结果
 export interface ScheduleResult {
@@ -84,7 +62,7 @@ export interface ScheduleDay {
   date: string; // YYYY-MM-DD
   dayOfWeek: number; // 0-6
   isRest: boolean;
-  isNoAssign: boolean;
+  isForceWork: boolean; // 强制工作日（不排休日）
   isWorkDay: boolean;
   // 当天同时休息的员工
   concurrentEmployees?: string[];
@@ -94,7 +72,7 @@ export interface ScheduleDay {
 export interface ScheduleConflict {
   date: string;
   employeeNames: string[];
-  type: 'exceed_limit' | 'concurrent_rest' | 'insufficient_rest';
+  type: 'insufficient_rest' | 'concurrent_rest';
   message: string;
 }
 
@@ -103,10 +81,9 @@ export interface ScheduleStats {
   totalDays: number;
   workDaysPerEmployee: number;
   restDaysPerEmployee: number;
-  noRestDaysCount: number;
+  forceWorkDaysCount: number; // 强制工作日天数
   avgConcurrentRest: number;
   maxConcurrentRest: number;
-  totalWorkDays: number;
 }
 
 // 星期名称
@@ -127,13 +104,6 @@ export const REST_PREFERENCE_OPTIONS: { value: RestPreference; label: string; de
   { value: 'scattered', label: '分散', description: '休息日尽量分散开' },
   { value: 'random', label: '随机', description: '随机安排休息日' },
 ];
-
-// 默认排班策略
-export const DEFAULT_SCHEDULE_STRATEGY: ScheduleStrategy = {
-  avoidMultipleRest: true,
-  maxConcurrentRest: 1,
-  conflictResolution: 'notify',
-};
 
 // 默认随机性配置
 export const DEFAULT_RANDOMNESS_CONFIG: RandomnessConfig = {

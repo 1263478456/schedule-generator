@@ -109,11 +109,11 @@ export function validateScheduleConfig(config: ScheduleConfig): ValidationResult
     });
   }
   
-  // 验证每周休息天数
-  if (config.weeklyRestDays < 0 || config.weeklyRestDays > 5) {
+  // 验证每月休息天数
+  if ((config as any).monthlyRestDays < 0 || (config as any).monthlyRestDays > 15) {
     errors.push({
-      field: 'weeklyRestDays',
-      message: '每周休息天数应在 0-5 之间',
+      field: 'monthlyRestDays',
+      message: '每月休息天数应在 0-15 之间',
       code: 'INVALID_REST_DAYS',
     });
   }
@@ -166,11 +166,11 @@ export function validateScheduleConfig(config: ScheduleConfig): ValidationResult
   
   // 检查休息天数是否合理
   const totalDays = new Date(config.year, config.month, 0).getDate();
-  const workDays = totalDays - config.noRestDaysOfWeek.length * Math.ceil(totalDays / 7);
+  const forceWorkDays = config.noRestDaysOfWeek.length * Math.ceil(totalDays / 7);
   
-  if (config.weeklyRestDays > 0 && workDays <= 0) {
+  if (config.monthlyRestDays > 0 && forceWorkDays >= totalDays) {
     warnings.push({
-      field: 'weeklyRestDays',
+      field: 'monthlyRestDays',
       message: '可排休天数不足，可能无法安排休息',
       code: 'INSUFFICIENT_WORK_DAYS',
     });

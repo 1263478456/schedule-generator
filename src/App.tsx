@@ -21,16 +21,11 @@ const currentMonth = new Date().getMonth() + 1;
 const defaultConfig: ScheduleConfigType = {
   year: currentYear,
   month: currentMonth,
-  weeklyRestDays: 1,
-  noRestDaysOfWeek: [0, 6],
+  monthlyRestDays: 4, // 默认每月休息4天
+  noRestDaysOfWeek: [0, 6], // 默认周六周日强制工作
   noRestDates: [],
   employees: [],
-  noRestDayType: 'work',
-  scheduleStrategy: {
-    avoidMultipleRest: true,
-    maxConcurrentRest: 1,
-    conflictResolution: 'notify',
-  },
+  maxConcurrentRest: 2, // 默认最多2人同时休息
   randomness: {
     enabled: true,
     intensity: 30,
@@ -83,12 +78,11 @@ function App() {
         setConfig({
           year: savedConfig.year,
           month: savedConfig.month,
-          weeklyRestDays: savedConfig.weeklyRestDays,
+          monthlyRestDays: (savedConfig as any).monthlyRestDays || 4,
           noRestDaysOfWeek: savedConfig.noRestDaysOfWeek,
           noRestDates: savedConfig.noRestDates,
           employees: savedConfig.employees,
-          noRestDayType: (savedConfig as any).noRestDayType || 'work',
-          scheduleStrategy: (savedConfig as any).scheduleStrategy || defaultConfig.scheduleStrategy,
+          maxConcurrentRest: (savedConfig as any).maxConcurrentRest || 2,
           randomness: (savedConfig as any).randomness || defaultConfig.randomness,
         });
       } catch (err) {
@@ -160,7 +154,7 @@ function App() {
     
     const totalDays = new Date(config.year, config.month, 0).getDate();
     const weeksInMonth = totalDays / 7;
-    const restDaysPerEmployee = Math.round(config.weeklyRestDays * weeksInMonth);
+    const restDaysPerEmployee = Math.round(config.monthlyRestDays * weeksInMonth);
     
     try {
       await saveHistory({
@@ -322,6 +316,7 @@ function App() {
             <div className={`lg:col-span-4 space-y-6 ${activeTab === 'preview' ? 'hidden md:block' : ''}`}>
               <EmployeeManager
                 employees={config.employees}
+                defaultMonthlyRestDays={config.monthlyRestDays}
                 onChange={(employees) => handleConfigChange({ ...config, employees })}
               />
               <ScheduleConfig config={config} onChange={handleConfigChange} />
