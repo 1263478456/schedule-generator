@@ -1,36 +1,62 @@
-import { useState } from 'react';
-import type { ScheduleHistoryItem } from '../utils/storage';
-import { historyStorage } from '../utils/storage';
+import { useState, useEffect } from 'react';
+import type { HistoryRecord } from '../utils/api';
+import { getHistory, deleteHistory, clearHistory } from '../utils/api';
 import ConfirmDialog from './ConfirmDialog';
 
 interface HistoryPanelProps {
-  onLoadHistory: (item: ScheduleHistoryItem) => void;
+  onLoadHistory: (item: HistoryRecord) => void;
   onClose: () => void;
 }
 
 export default function HistoryPanel({ onLoadHistory, onClose }: HistoryPanelProps) {
-  const [history, setHistory] = useState<ScheduleHistoryItem[]>(historyStorage.load());
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; item: ScheduleHistoryItem | null }>({
+  const [history, setHistory] = useState<HistoryRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; item: HistoryRecord | null }>({
     isOpen: false,
     item: null,
   });
 
-  const handleDelete = (item: ScheduleHistoryItem) => {
+  // 加载历史记录
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  const loadHistory = async () => {
+    try {
+      setIsLoading(true);
+      const response = await getHistory();
+      setHistory(response.records);
+    } catch (err) {
+      console.error('加载历史记录失败:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = (item: HistoryRecord) => {
     setDeleteConfirm({ isOpen: true, item });
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deleteConfirm.item) {
-      historyStorage.delete(deleteConfirm.item.id);
-      setHistory(historyStorage.load());
+      try {
+        await deleteHistory(deleteConfirm.item.id);
+        setHistory(prev => prev.filter(h => h.id !== deleteConfirm.item!.id));
+      } catch (err) {
+        console.error('删除失败:', err);
+      }
     }
     setDeleteConfirm({ isOpen: false, item: null });
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (window.confirm('确定要清空所有历史记录吗？此操作不可恢复。')) {
-      historyStorage.clear();
-      setHistory([]);
+      try {
+        await clearHistory();
+        setHistory([]);
+      } catch (err) {
+        console.error('清空失败:', err);
+      }
     }
   };
 
@@ -59,7 +85,7 @@ export default function HistoryPanel({ onLoadHistory, onClose }: HistoryPanelPro
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-800">历史排班表</h2>
-              <p className="text-sm text-gray-500">共 {history.length} 条记录</p>
+              <p className="text-sm text-gray-500">共 {history.length} 条记录（服务端存储）</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -84,7 +110,12 @@ export default function HistoryPanel({ onLoadHistory, onClose }: HistoryPanelPro
 
         {/* 内容 */}
         <div className="flex-1 overflow-y-auto p-6">
-          {history.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-12">
+              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-500">加载中...</p>
+            </div>
+          ) : history.length === 0 ? (
             <div className="text-center py-12">
               <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />

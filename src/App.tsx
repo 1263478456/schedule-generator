@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ScheduleConfig as ScheduleConfigType } from './types';
-import type { ScheduleHistoryItem } from './utils/storage';
-import { configStorage, employeeStorage, historyStorage } from './utils/storage';
+import type { HistoryRecord } from './utils/api';
+import { getConfig, saveConfig, saveHistory } from './utils/api';
 import { validateScheduleConfig, escapeHtml } from './utils/validation';
 import EmployeeManager from './components/EmployeeManager';
 import ScheduleConfig from './components/ScheduleConfig';
@@ -25,45 +25,55 @@ const defaultConfig: ScheduleConfigType = {
   employees: [],
 };
 
-// 从 localStorage 加载初始配置的函数
-function loadInitialConfig(): ScheduleConfigType {
-  const savedConfig = configStorage.load();
-  const savedEmployees = employeeStorage.load();
-  
-  const employees = savedEmployees.length > 0 ? savedEmployees : defaultConfig.employees;
-  
-  if (savedConfig) {
-    return {
-      year: savedConfig.year,
-      month: savedConfig.month,
-      weeklyRestDays: savedConfig.weeklyRestDays,
-      noRestDaysOfWeek: savedConfig.noRestDaysOfWeek,
-      noRestDates: savedConfig.noRestDates,
-      employees,
-    };
-  }
-  
-  return {
-    ...defaultConfig,
-    employees,
-  };
-}
-
 function App() {
   const { toasts, removeToast, success, error, warning } = useToast();
-  const [config, setConfig] = useState<ScheduleConfigType>(loadInitialConfig);
-  
+  const [config, setConfig] = useState<ScheduleConfigType>(defaultConfig);
   const [activeTab, setActiveTab] = useState<'config' | 'preview'>('config');
   const [showHistory, setShowHistory] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 保存配置到 localStorage
+  // 从服务器加载配置
   useEffect(() => {
-    const { employees, ...configWithoutEmployees } = config;
-    configStorage.save(configWithoutEmployees);
-    employeeStorage.save(employees);
-  }, [config]);
+    const loadConfig = async () => {
+      try {
+        const savedConfig = await getConfig();
+        setConfig({
+          year: savedConfig.year,
+          month: savedConfig.month,
+          weeklyRestDays: savedConfig.weeklyRestDays,
+          noRestDaysOfWeek: savedConfig.noRestDaysOfWeek,
+          noRestDates: savedConfig.noRestDates,
+          employees: savedConfig.employees,
+        });
+      } catch (err) {
+        console.error('加载配置失败:', err);
+        // 使用默认配置
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadConfig();
+  }, []);
+
+  // 保存配置到服务器
+  useEffect(() => {
+    if (isLoading) return; // 加载中不保存
+
+    const saveConfigToServer = async () => {
+      try {
+        await saveConfig(config);
+      } catch (err) {
+        console.error('保存配置失败:', err);
+      }
+    };
+
+    // 防抖保存
+    const timer = setTimeout(saveConfigToServer, 500);
+    return () => clearTimeout(timer);
+  }, [config, isLoading]);
 
   const handleConfigChange = useCallback((newConfig: ScheduleConfigType) => {
     // 验证配置
@@ -83,7 +93,7 @@ function App() {
     setConfig(newConfig);
   }, [warning]);
 
-  const handleSaveHistory = useCallback(() => {
+  const handleSaveHistory = useCallback(async () => {
     const validation = validateScheduleConfig(config);
     
     if (!validation.valid) {
@@ -100,26 +110,25 @@ function App() {
     const weeksInMonth = totalDays / 7;
     const restDaysPerEmployee = Math.round(config.weeklyRestDays * weeksInMonth);
     
-    const item = historyStorage.save({
-      name: `${config.year}年${config.month}月排班表`,
-      config,
-      results: [],
-      stats: {
-        totalDays,
-        workDaysPerEmployee: totalDays - restDaysPerEmployee,
-        restDaysPerEmployee,
-        employeesCount: config.employees.length,
-      },
-    });
-    
-    if (item) {
+    try {
+      await saveHistory({
+        name: `${config.year}年${config.month}月排班表`,
+        config,
+        results: [],
+        stats: {
+          totalDays,
+          workDaysPerEmployee: totalDays - restDaysPerEmployee,
+          restDaysPerEmployee,
+          employeesCount: config.employees.length,
+        },
+      });
       success('排班表已保存到历史记录');
-    } else {
+    } catch (err) {
       error('保存失败，请重试');
     }
   }, [config, success, error]);
 
-  const handleLoadHistory = useCallback((item: ScheduleHistoryItem) => {
+  const handleLoadHistory = useCallback(async (item: HistoryRecord) => {
     setConfig(item.config);
     setShowHistory(false);
     success(`已加载"${item.name}"`);
@@ -137,12 +146,23 @@ function App() {
       noRestDaysOfWeek: [0, 6],
     };
     setConfig(newConfig);
-    configStorage.clear();
     setDeleteConfirm(false);
     success('配置已重置');
   }, [success]);
 
   const hasEmployees = config.employees.length > 0;
+
+  // 加载中状态
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ErrorBoundary>
@@ -159,7 +179,7 @@ function App() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-800">智能排班表生成器</h1>
-                  <p className="text-xs text-gray-500">v{APP_VERSION} · 自定义员工信息和休息规则</p>
+                  <p className="text-xs text-gray-500">v{APP_VERSION} · 数据已同步到服务器</p>
                 </div>
               </div>
               
@@ -254,7 +274,7 @@ function App() {
         {/* 页脚 */}
         <footer className="mt-12 py-6 border-t border-gray-200 bg-white/50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-500">
-            <p>智能排班表生成器 v{APP_VERSION} · 轻松管理员工排班</p>
+            <p>智能排班表生成器 v{APP_VERSION} · 数据已同步到服务器</p>
           </div>
         </footer>
 
