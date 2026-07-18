@@ -61,106 +61,7 @@ function shuffle<T>(array: T[], random: () => number): T[] {
 }
 
 /**
- * 生成连休日
- */
-function generateConsecutiveRestDays(availableDays: number[], count: number, random: () => number): number[] {
-  if (count <= 0 || availableDays.length === 0) return [];
-  
-  const sortedDays = [...availableDays].sort((a, b) => a - b);
-  const segments: number[][] = [];
-  let currentSegment: number[] = [sortedDays[0]];
-  
-  for (let i = 1; i < sortedDays.length; i++) {
-    if (sortedDays[i] === sortedDays[i - 1] + 1) {
-      currentSegment.push(sortedDays[i]);
-    } else {
-      segments.push(currentSegment);
-      currentSegment = [sortedDays[i]];
-    }
-  }
-  segments.push(currentSegment);
-  segments.sort((a, b) => b.length - a.length);
-  
-  const result: number[] = [];
-  let remaining = count;
-  
-  for (const segment of segments) {
-    if (remaining <= 0) break;
-    const take = Math.min(remaining, segment.length);
-    if (random() > 0.5) {
-      result.push(...segment.slice(0, take));
-    } else {
-      result.push(...segment.slice(-take));
-    }
-    remaining -= take;
-  }
-  
-  return result;
-}
-
-/**
- * 生成分散休息日
- */
-function generateScatteredRestDays(availableDays: number[], count: number, totalDays: number, random: () => number): number[] {
-  if (count <= 0 || availableDays.length === 0) return [];
-  
-  const interval = Math.floor(totalDays / count);
-  const startOffset = Math.floor(random() * interval);
-  const sortedDays = [...availableDays].sort((a, b) => a - b);
-  const result: number[] = [];
-  
-  for (let i = 0; i < count; i++) {
-    const targetDay = startOffset + i * interval + 1;
-    let bestDay = sortedDays[0];
-    let bestDiff = Math.abs(bestDay - targetDay);
-    
-    for (const day of sortedDays) {
-      const diff = Math.abs(day - targetDay);
-      if (diff < bestDiff && !result.includes(day)) {
-        bestDay = day;
-        bestDiff = diff;
-      }
-    }
-    
-    if (!result.includes(bestDay)) {
-      result.push(bestDay);
-    }
-  }
-  
-  return result;
-}
-
-/**
- * 生成随机休息日
- */
-function generateRandomRestDays(availableDays: number[], count: number, random: () => number): number[] {
-  if (count <= 0 || availableDays.length === 0) return [];
-  return shuffle(availableDays, random).slice(0, count);
-}
-
-/**
- * 根据偏好生成休息日
- */
-function generateRestDaysByPreference(
-  availableDays: number[],
-  count: number,
-  totalDays: number,
-  preference: RestPreference,
-  random: () => number
-): number[] {
-  switch (preference) {
-    case 'consecutive':
-      return generateConsecutiveRestDays(availableDays, count, random);
-    case 'scattered':
-      return generateScatteredRestDays(availableDays, count, totalDays, random);
-    case 'random':
-    default:
-      return generateRandomRestDays(availableDays, count, random);
-  }
-}
-
-/**
- * 智能排班算法
+ * 智能排班算法（负载均衡版）
  */
 export function generateSmartSchedule(config: ScheduleConfig): {
   results: ScheduleResult[];
@@ -213,11 +114,93 @@ export function generateSmartSchedule(config: ScheduleConfig): {
   employees.forEach((emp) => schedule.set(emp.id, new Set()));
   availableDays.forEach((day) => dayAssignments.set(day, []));
   
-  // 4. 第一轮：为每个员工分配最少休息天数
-  for (const { employee, minRest, preference } of employeeConfigs) {
+  // 辅助函数：获取某天当前休息人数
+  const getRestCount = (day: number) => dayAssignments.get(day)?.length || 0;
+  
+  // 辅助函数：获取负载最小的可用日期列表
+  const getLeastLoadedDays = (days: number[]): number[] => {
+    if (days.length === 0) return [];
+    
+    // 按当前休息人数分组
+    const grouped = new Map<number, number[]>();
+    for (const day of days) {
+      const count = getRestCount(day);
+      if (!grouped.has(count)) grouped.set(count, []);
+      grouped.get(count)!.push(day);
+    }
+    
+    // 找到最小负载
+    const minLoad = Math.min(...grouped.keys());
+    return grouped.get(minLoad) || [];
+  };
+  
+  // 辅助函数：选择最佳休息日（负载均衡）
+  const selectBestRestDays = (
+    candidateDays: number[],
+    count: number,
+    preference: RestPreference
+  ): number[] => {
+    if (count <= 0 || candidateDays.length === 0) return [];
+    
+    const result: number[] = [];
+    const remaining = [...candidateDays];
+    
+    for (let i = 0; i < count && remaining.length > 0; i++) {
+      // 获取负载最小的日期
+      const leastLoaded = getLeastLoadedDays(remaining);
+      
+      let selected: number;
+      
+      if (preference === 'consecutive' && result.length > 0) {
+        // 连休模式：优先选择与已选日期相邻的
+        const lastDay = result[result.length - 1];
+        const adjacent = leastLoaded.filter(d => Math.abs(d - lastDay) === 1);
+        if (adjacent.length > 0) {
+          selected = adjacent[Math.floor(random() * adjacent.length)];
+        } else {
+          selected = leastLoaded[Math.floor(random() * leastLoaded.length)];
+        }
+      } else if (preference === 'scattered') {
+        // 分散模式：选择距离已选日期最远的
+        if (result.length === 0) {
+          selected = leastLoaded[Math.floor(random() * leastLoaded.length)];
+        } else {
+          let bestDay = leastLoaded[0];
+          let bestMinDist = 0;
+          
+          for (const day of leastLoaded) {
+            const minDist = Math.min(...result.map(d => Math.abs(d - day)));
+            if (minDist > bestMinDist) {
+              bestMinDist = minDist;
+              bestDay = day;
+            }
+          }
+          selected = bestDay;
+        }
+      } else {
+        // 随机模式或默认：从负载最小的日期中随机选择
+        selected = leastLoaded[Math.floor(random() * leastLoaded.length)];
+      }
+      
+      result.push(selected);
+      remaining.splice(remaining.indexOf(selected), 1);
+    }
+    
+    return result;
+  };
+  
+  // 4. 第一轮：为每个员工分配最少休息天数（带负载均衡）
+  // 打乱员工顺序，避免固定模式
+  const shuffledConfigs = shuffle([...employeeConfigs], random);
+  
+  for (const { employee, minRest, preference } of shuffledConfigs) {
     if (minRest <= 0) continue;
     
-    const restDays = generateRestDaysByPreference(availableDays, minRest, totalDays, preference, random);
+    // 获取该员工可用的日期（排除已排休的日期）
+    const available = availableDays.filter((day) => !schedule.get(employee.id)?.has(day));
+    
+    // 使用负载均衡策略选择休息日
+    const restDays = selectBestRestDays(available, minRest, preference);
     
     for (const day of restDays) {
       schedule.get(employee.id)?.add(day);
@@ -226,21 +209,26 @@ export function generateSmartSchedule(config: ScheduleConfig): {
     }
   }
   
-  // 5. 第二轮：分配最大休息天数
-  for (const { employee, maxRest, preference } of employeeConfigs) {
+  // 5. 第二轮：分配最大休息天数（带负载均衡和并发限制）
+  for (const { employee, maxRest, preference } of shuffledConfigs) {
     const currentRest = schedule.get(employee.id)?.size || 0;
     const remaining = maxRest - currentRest;
     
     if (remaining <= 0) continue;
     
-    const available = availableDays.filter((day) => !schedule.get(employee.id)?.has(day));
-    const additionalDays = generateRestDaysByPreference(available, remaining, totalDays, preference, random);
+    // 获取可用日期（排除已排休和已达并发上限的日期）
+    const available = availableDays.filter((day) => {
+      if (schedule.get(employee.id)?.has(day)) return false;
+      if (getRestCount(day) >= maxConcurrentRest) return false;
+      return true;
+    });
+    
+    // 使用负载均衡策略选择休息日
+    const additionalDays = selectBestRestDays(available, remaining, preference);
     
     for (const day of additionalDays) {
-      const dayEmps = dayAssignments.get(day) || [];
-      if (dayEmps.length >= maxConcurrentRest) continue;
-      
       schedule.get(employee.id)?.add(day);
+      const dayEmps = dayAssignments.get(day) || [];
       dayAssignments.set(day, [...dayEmps, employee.id]);
     }
   }
