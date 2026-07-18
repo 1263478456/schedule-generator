@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import db from './database.js';
+import { authMiddleware } from './auth.js';
 
 const router = Router();
 
 // ==================== 配置 API ====================
 
-// 获取配置
-router.get('/config', (req, res) => {
+// 获取配置（需要登录）
+router.get('/config', authMiddleware, (req, res) => {
   try {
     const config = db.prepare('SELECT * FROM config WHERE id = 1').get();
     
@@ -19,9 +20,12 @@ router.get('/config', (req, res) => {
       year: config.year,
       month: config.month,
       weeklyRestDays: config.weekly_rest_days,
-      noRestDaysOfWeek: JSON.parse(config.no_rest_days_of_week),
-      noRestDates: JSON.parse(config.no_rest_dates),
-      employees: JSON.parse(config.employees),
+      noRestDaysOfWeek: JSON.parse(config.no_rest_days_of_week || '[]'),
+      noRestDates: JSON.parse(config.no_rest_dates || '[]'),
+      employees: JSON.parse(config.employees || '[]'),
+      scheduleStrategy: JSON.parse(config.schedule_strategy || '{}'),
+      noRestDayType: config.no_rest_day_type || 'work',
+      randomness: JSON.parse(config.randomness || '{"enabled":true,"intensity":30}'),
       updatedAt: config.updated_at,
     });
   } catch (error) {
@@ -30,10 +34,10 @@ router.get('/config', (req, res) => {
   }
 });
 
-// 保存配置
-router.put('/config', (req, res) => {
+// 保存配置（需要登录）
+router.put('/config', authMiddleware, (req, res) => {
   try {
-    const { year, month, weeklyRestDays, noRestDaysOfWeek, noRestDates, employees } = req.body;
+    const { year, month, weeklyRestDays, noRestDaysOfWeek, noRestDates, employees, scheduleStrategy, noRestDayType, randomness } = req.body;
     
     const stmt = db.prepare(`
       UPDATE config SET
@@ -43,6 +47,9 @@ router.put('/config', (req, res) => {
         no_rest_days_of_week = ?,
         no_rest_dates = ?,
         employees = ?,
+        schedule_strategy = ?,
+        no_rest_day_type = ?,
+        randomness = ?,
         updated_at = datetime('now')
       WHERE id = 1
     `);
@@ -53,7 +60,10 @@ router.put('/config', (req, res) => {
       weeklyRestDays,
       JSON.stringify(noRestDaysOfWeek || []),
       JSON.stringify(noRestDates || []),
-      JSON.stringify(employees || [])
+      JSON.stringify(employees || []),
+      JSON.stringify(scheduleStrategy || {}),
+      noRestDayType || 'work',
+      JSON.stringify(randomness || { enabled: true, intensity: 30 })
     );
     
     res.json({ success: true, message: '配置已保存' });
@@ -65,8 +75,8 @@ router.put('/config', (req, res) => {
 
 // ==================== 历史记录 API ====================
 
-// 获取历史记录列表
-router.get('/history', (req, res) => {
+// 获取历史记录列表（需要登录）
+router.get('/history', authMiddleware, (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
@@ -102,8 +112,8 @@ router.get('/history', (req, res) => {
   }
 });
 
-// 获取单条历史记录
-router.get('/history/:id', (req, res) => {
+// 获取单条历史记录（需要登录）
+router.get('/history/:id', authMiddleware, (req, res) => {
   try {
     const { id } = req.params;
     
@@ -127,8 +137,8 @@ router.get('/history/:id', (req, res) => {
   }
 });
 
-// 保存历史记录
-router.post('/history', (req, res) => {
+// 保存历史记录（需要登录）
+router.post('/history', authMiddleware, (req, res) => {
   try {
     const { id, name, config, results, stats } = req.body;
     
@@ -155,8 +165,8 @@ router.post('/history', (req, res) => {
   }
 });
 
-// 删除历史记录
-router.delete('/history/:id', (req, res) => {
+// 删除历史记录（需要登录）
+router.delete('/history/:id', authMiddleware, (req, res) => {
   try {
     const { id } = req.params;
     
@@ -173,8 +183,8 @@ router.delete('/history/:id', (req, res) => {
   }
 });
 
-// 清空所有历史记录
-router.delete('/history', (req, res) => {
+// 清空所有历史记录（需要登录）
+router.delete('/history', authMiddleware, (req, res) => {
   try {
     db.prepare('DELETE FROM history').run();
     res.json({ success: true, message: '所有历史记录已清空' });

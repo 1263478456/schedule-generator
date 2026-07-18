@@ -5,11 +5,20 @@ const API_BASE = '/api';
 
 // 通用请求函数
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('token');
+  
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options?.headers as Record<string, string> || {}),
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
   const response = await fetch(`${API_BASE}${url}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
     ...options,
+    headers,
   });
 
   if (!response.ok) {
@@ -29,6 +38,9 @@ export interface ConfigData {
   noRestDaysOfWeek: number[];
   noRestDates: string[];
   employees: ScheduleConfig['employees'];
+  scheduleStrategy?: any;
+  noRestDayType?: string;
+  randomness?: { enabled: boolean; intensity: number };
 }
 
 // 获取配置

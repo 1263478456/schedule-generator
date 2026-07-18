@@ -57,6 +57,11 @@ if (tableExists('config') && !columnExists('config', 'no_rest_day_type')) {
   db.exec('DROP TABLE IF EXISTS config');
 }
 
+if (tableExists('config') && !columnExists('config', 'randomness')) {
+  console.log('⚠️  检测到旧版 config 表（缺少 randomness），正在重建...');
+  db.exec('DROP TABLE IF EXISTS config');
+}
+
 // 创建表
 db.exec(`
   -- 用户表
@@ -81,6 +86,7 @@ db.exec(`
     employees TEXT NOT NULL DEFAULT '[]',
     schedule_strategy TEXT NOT NULL DEFAULT '{}',
     no_rest_day_type TEXT NOT NULL DEFAULT 'work',
+    randomness TEXT NOT NULL DEFAULT '{"enabled":true,"intensity":30}',
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -113,8 +119,8 @@ if (!adminExists) {
 
 // 初始化默认配置
 const initConfig = db.prepare(`
-  INSERT OR IGNORE INTO config (id, year, month, weekly_rest_days, no_rest_days_of_week, no_rest_dates, employees, schedule_strategy, no_rest_day_type)
-  VALUES (1, ?, ?, 1, '[]', '[]', '[]', '{}', 'work')
+  INSERT OR IGNORE INTO config (id, year, month, weekly_rest_days, no_rest_days_of_week, no_rest_dates, employees, schedule_strategy, no_rest_day_type, randomness)
+  VALUES (1, ?, ?, 1, '[]', '[]', '[]', '{}', 'work', '{"enabled":true,"intensity":30}')
 `);
 
 const currentYear = new Date().getFullYear();
