@@ -99,26 +99,27 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
       )}
 
       {/* 排班表格 */}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+      <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+        <table className="border-collapse text-sm" style={{ minWidth: '100%' }}>
           <thead>
             <tr className="bg-gray-50">
-              <th className="sticky left-0 bg-gray-50 z-10 px-2 py-2 text-left font-semibold text-gray-700 min-w-[70px]">
+              <th className="sticky left-0 bg-gray-50 z-10 px-2 py-2 text-left font-semibold text-gray-700" style={{ minWidth: '70px' }}>
                 姓名
               </th>
               {dates.map(({ day, dayOfWeek, isWeekend }) => (
                 <th
                   key={day}
-                  className={`px-1 py-2 text-center font-medium min-w-[28px] ${
+                  className={`px-1 py-2 text-center font-medium ${
                     isWeekend ? 'bg-red-50 text-red-600' : 'text-gray-600'
                   }`}
+                  style={{ minWidth: '32px', width: '32px' }}
                 >
                   <div className="text-xs">{day}</div>
                   <div className="text-[10px] text-gray-400">{DAY_NAMES[dayOfWeek]}</div>
                 </th>
               ))}
-              <th className="px-2 py-2 text-center font-medium text-blue-600 text-xs">工作</th>
-              <th className="px-2 py-2 text-center font-medium text-green-600 text-xs">休息</th>
+              <th className="px-2 py-2 text-center font-medium text-blue-600 text-xs" style={{ minWidth: '40px' }}>工作</th>
+              <th className="px-2 py-2 text-center font-medium text-green-600 text-xs" style={{ minWidth: '40px' }}>休息</th>
             </tr>
           </thead>
           <tbody>
@@ -129,7 +130,7 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
                   idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
                 }`}
               >
-                <td className="sticky left-0 z-10 px-2 py-2 font-medium text-gray-800 bg-inherit text-sm">
+                <td className="sticky left-0 z-10 px-2 py-2 font-medium text-gray-800 bg-inherit text-sm" style={{ minWidth: '70px' }}>
                   <div className="flex items-center gap-1">
                     <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
                       {result.employeeName.charAt(0)}
@@ -149,16 +150,17 @@ export default function ScheduleTable({ config }: ScheduleTableProps) {
                             : 'bg-green-100 text-green-700'
                           : 'bg-blue-50 text-blue-600'
                       }`}
+                      style={{ minWidth: '32px', width: '32px' }}
                       title={hasConcurrent ? `同休: ${day.concurrentEmployees?.join(', ')}` : undefined}
                     >
                       {day.isRest ? (hasConcurrent ? '休*' : '休') : '✓'}
                     </td>
                   );
                 })}
-                <td className="px-2 py-2 text-center font-semibold text-blue-600 text-xs">
+                <td className="px-2 py-2 text-center font-semibold text-blue-600 text-xs" style={{ minWidth: '40px' }}>
                   {result.totalWorkDays}
                 </td>
-                <td className="px-2 py-2 text-center font-semibold text-green-600 text-xs">
+                <td className="px-2 py-2 text-center font-semibold text-green-600 text-xs" style={{ minWidth: '40px' }}>
                   {result.totalRestDays}
                 </td>
               </tr>
