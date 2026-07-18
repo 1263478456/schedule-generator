@@ -13,7 +13,7 @@ function formatDateDisplay(dateStr: string): string {
 }
 
 /**
- * 生成排班表HTML内容
+ * 生成排班表HTML内容（优化版）
  */
 export function generateScheduleHTML(config: ScheduleConfig): string {
   const { results, stats } = generateOptimizedSchedule(config);
@@ -21,42 +21,55 @@ export function generateScheduleHTML(config: ScheduleConfig): string {
   
   const totalDays = new Date(year, month, 0).getDate();
   
+  // 计算动态列宽（确保表格能适应页面宽度）
+  // 横向 A4 宽度 297mm，减去左右边距 20mm，可用宽度 277mm
+  // 姓名列 50mm，工作/休息统计列各 25mm，剩余给日期列
+  const usableWidth = 277; // mm
+  const nameColWidth = 50;
+  const statsColWidth = 28;
+  const dateColWidth = Math.max(6, Math.floor((usableWidth - nameColWidth - statsColWidth * 2) / totalDays));
+  
   // 构建日期行
-  let dateRow = '<th style="width: 80px;">姓名</th>';
+  let dateRow = `<th style="width: ${nameColWidth}px; min-width: ${nameColWidth}px;">姓名</th>`;
   for (let day = 1; day <= totalDays; day++) {
     const date = new Date(year, month - 1, day);
     const dow = date.getDay();
     const isWeekend = dow === 0 || dow === 6;
     const bgColor = isWeekend ? '#fef3c7' : '#f3f4f6';
-    dateRow += `<th style="background-color: ${bgColor}; min-width: 28px; font-size: 10px;">${day}<br><span style="font-size: 9px; color: #6b7280;">${DAY_NAMES[dow]}</span></th>`;
+    dateRow += `<th style="background-color: ${bgColor}; width: ${dateColWidth}px; min-width: ${dateColWidth}px; font-size: 9px; padding: 2px 1px;">${day}<br><span style="font-size: 8px; color: #6b7280;">${DAY_NAMES[dow]}</span></th>`;
   }
-  dateRow += '<th style="width: 60px;">工作日</th><th style="width: 60px;">休息日</th>';
+  dateRow += `<th style="width: ${statsColWidth}px; min-width: ${statsColWidth}px; font-size: 9px;">工作</th><th style="width: ${statsColWidth}px; min-width: ${statsColWidth}px; font-size: 9px;">休息</th>`;
   
   // 构建员工行
   let employeeRows = '';
   results.forEach((result, idx) => {
     const bgColor = idx % 2 === 0 ? '#ffffff' : '#f9fafb';
-    employeeRows += `<tr style="background-color: ${bgColor};"><td style="font-weight: 600; text-align: left; padding-left: 10px;">${result.employeeName}</td>`;
+    employeeRows += `<tr style="background-color: ${bgColor};"><td style="font-weight: 600; text-align: left; padding-left: 6px; font-size: 10px; white-space: nowrap;">${result.employeeName}</td>`;
     
     result.days.forEach((day) => {
-      let cellStyle = '';
+      let cellStyle = 'font-size: 9px; padding: 2px 1px;';
       let cellContent = '';
       
       if (day.isRest) {
         // 休息日
-        cellStyle = 'background-color: #dcfce7; color: #166534; font-weight: 500;';
-        cellContent = '休';
+        if (day.concurrentEmployees && day.concurrentEmployees.length > 1) {
+          cellStyle += 'background-color: #fef3c7; color: #92400e; font-weight: 500;';
+          cellContent = '休*';
+        } else {
+          cellStyle += 'background-color: #dcfce7; color: #166534; font-weight: 500;';
+          cellContent = '休';
+        }
       } else {
         // 工作日
-        cellStyle = 'background-color: #eff6ff; color: #1e40af;';
+        cellStyle += 'background-color: #eff6ff; color: #1e40af;';
         cellContent = '✓';
       }
       
       employeeRows += `<td style="${cellStyle}">${cellContent}</td>`;
     });
     
-    employeeRows += `<td style="font-weight: 600; color: #1e40af;">${result.totalWorkDays}</td>`;
-    employeeRows += `<td style="font-weight: 600; color: #166534;">${result.totalRestDays}</td>`;
+    employeeRows += `<td style="font-weight: 600; color: #1e40af; font-size: 10px;">${result.totalWorkDays}</td>`;
+    employeeRows += `<td style="font-weight: 600; color: #166534; font-size: 10px;">${result.totalRestDays}</td>`;
     employeeRows += '</tr>';
   });
   
@@ -72,54 +85,52 @@ export function generateScheduleHTML(config: ScheduleConfig): string {
   }
   
   return `
-    <div style="text-align: center; margin-bottom: 20px;">
-      <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 8px; color: #1e293b;">
+    <div style="text-align: center; margin-bottom: 15px;">
+      <h1 style="font-size: 20px; font-weight: bold; margin-bottom: 6px; color: #1e293b;">
         ${year}年${month}月 员工排班表
       </h1>
-      <div style="font-size: 12px; color: #64748b;">
+      <div style="font-size: 11px; color: #64748b;">
         ${noRestDaysInfo || '无特殊不排休日'}
       </div>
-      <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">
+      <div style="font-size: 10px; color: #94a3b8; margin-top: 3px;">
         共 ${stats.totalDays} 天 | 每人工作 ${stats.workDaysPerEmployee} 天 | 每人休息 ${stats.restDaysPerEmployee} 天
       </div>
     </div>
     
-    <div style="overflow-x: auto;">
-      <table class="schedule-table" style="width: 100%; border-collapse: collapse; font-size: 11px;">
-        <thead>
-          <tr style="background-color: #f3f4f6;">
-            ${dateRow}
-          </tr>
-        </thead>
-        <tbody>
-          ${employeeRows}
-        </tbody>
-      </table>
-    </div>
+    <table class="schedule-table" style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+      <thead>
+        <tr style="background-color: #f3f4f6;">
+          ${dateRow}
+        </tr>
+      </thead>
+      <tbody>
+        ${employeeRows}
+      </tbody>
+    </table>
     
-    <div style="margin-top: 20px; font-size: 10px; color: #94a3b8; display: flex; gap: 20px; justify-content: center;">
-      <div style="display: flex; align-items: center; gap: 4px;">
-        <span style="display: inline-block; width: 16px; height: 16px; background-color: #dcfce7; border: 1px solid #bbf7d0;"></span>
+    <div style="margin-top: 15px; font-size: 9px; color: #94a3b8; display: flex; gap: 15px; justify-content: center;">
+      <div style="display: flex; align-items: center; gap: 3px;">
+        <span style="display: inline-block; width: 12px; height: 12px; background-color: #dcfce7; border: 1px solid #bbf7d0;"></span>
         <span>休息日</span>
       </div>
-      <div style="display: flex; align-items: center; gap: 4px;">
-        <span style="display: inline-block; width: 16px; height: 16px; background-color: #eff6ff; border: 1px solid #bfdbfe;"></span>
+      <div style="display: flex; align-items: center; gap: 3px;">
+        <span style="display: inline-block; width: 12px; height: 12px; background-color: #eff6ff; border: 1px solid #bfdbfe;"></span>
         <span>工作日</span>
       </div>
-      <div style="display: flex; align-items: center; gap: 4px;">
-        <span style="display: inline-block; width: 16px; height: 16px; background-color: #e5e7eb; border: 1px solid #d1d5db;"></span>
-        <span>不排休日</span>
+      <div style="display: flex; align-items: center; gap: 3px;">
+        <span style="display: inline-block; width: 12px; height: 12px; background-color: #fef3c7; border: 1px solid #fde68a;"></span>
+        <span>多人同休</span>
       </div>
     </div>
     
-    <div style="margin-top: 16px; font-size: 9px; color: #cbd5e1; text-align: right;">
+    <div style="margin-top: 10px; font-size: 8px; color: #cbd5e1; text-align: right;">
       生成时间：${new Date().toLocaleString('zh-CN')}
     </div>
   `;
 }
 
 /**
- * 导出为PDF
+ * 导出为PDF（横向 A4）
  */
 export async function exportToPDF(config: ScheduleConfig): Promise<void> {
   // 创建临时容器
@@ -129,9 +140,9 @@ export async function exportToPDF(config: ScheduleConfig): Promise<void> {
     position: fixed;
     left: -9999px;
     top: 0;
-    width: 210mm;
+    width: 297mm;
     background: white;
-    padding: 15mm;
+    padding: 10mm 15mm;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   `;
   container.innerHTML = generateScheduleHTML(config);
@@ -139,7 +150,7 @@ export async function exportToPDF(config: ScheduleConfig): Promise<void> {
   
   try {
     // 等待渲染完成
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 150));
     
     // 使用html2canvas捕获内容
     const canvas = await html2canvas(container, {
@@ -149,15 +160,15 @@ export async function exportToPDF(config: ScheduleConfig): Promise<void> {
       backgroundColor: '#ffffff',
     });
     
-    // 创建PDF（A4尺寸）
+    // 创建PDF（横向 A4 尺寸）
     const pdf = new jsPDF({
-      orientation: 'portrait',
+      orientation: 'landscape',
       unit: 'mm',
       format: 'a4',
     });
     
-    const pageWidth = 210; // A4宽度
-    const pageHeight = 297; // A4高度
+    const pageWidth = 297; // 横向 A4 宽度
+    const pageHeight = 210; // 横向 A4 高度
     
     const imgWidth = pageWidth;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
