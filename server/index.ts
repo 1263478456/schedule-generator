@@ -23,7 +23,7 @@ const distPath = path.join(__dirname, '../dist');
 app.use(express.static(distPath));
 
 // SPA 路由支持（所有非 API 路由返回 index.html）
-app.get('*', (req, res) => {
+app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
